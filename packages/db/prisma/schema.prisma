@@ -1,0 +1,379 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Tenant {
+  id               String            @id @default(uuid())
+  slug             String            @unique
+  name             String
+  plan             TenantPlan        @default(FREE)
+  isActive         Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  answers          Answer[]
+  apiKeys          ApiKey[]
+  evaluationModels EvaluationModel[]
+  projects         Project[]
+  results          Result[]
+  sessions         Session[]
+  users            User[]
+
+  @@map("tenants")
+}
+
+model ApiKey {
+  id        String    @id @default(uuid())
+  name      String
+  keyHash   String    @unique
+  tenantId  String
+  isActive  Boolean   @default(true)
+  lastUsed  DateTime?
+  createdAt DateTime  @default(now())
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("api_keys")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String
+  passwordHash String
+  name         String?
+  role         UserRole @default(VIEWER)
+  tenantId     String
+  isActive     Boolean  @default(true)
+  refreshToken String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([email, tenantId])
+  @@map("users")
+}
+
+model Project {
+  id               String            @id @default(uuid())
+  name             String
+  description      String?
+  tenantId         String
+  isActive         Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  evaluationModels EvaluationModel[]
+  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("projects")
+}
+
+model EvaluationModel {
+  id             String          @id @default(uuid())
+  name           String
+  description    String?
+  version        Int             @default(1)
+  status         ModelStatus     @default(DRAFT)
+  publishedAt    DateTime?
+  projectId      String
+  tenantId       String
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  answers        Answer[]
+  axes           Axis[]
+  project        Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  outputFormats  OutputFormat[]
+  questions      Question[]
+  resultTemplate ResultTemplate?
+  results        Result[]
+  sessions       Session[]
+
+  @@map("evaluation_models")
+}
+
+model ResultTemplate {
+  id             String          @id @default(uuid())
+  modelId        String          @unique
+  name           String
+  outputType     String          @default("CUSTOM")
+  config         Json            @default("{}")
+  promptTemplate String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  model          EvaluationModel @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  @@map("result_templates")
+}
+
+model OutputFormat {
+  id             String          @id @default(uuid())
+  modelId        String
+  name           String
+  description    String?
+  outputType     String          @default("TYPE_CLASSIFICATION")
+  config         Json            @default("{}")
+  promptTemplate String?
+  axisWeights    Json?
+  order          Int             @default(0)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  model          EvaluationModel @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  @@map("output_formats")
+}
+
+model Axis {
+  id             String                @id @default(uuid())
+  name           String
+  description    String?
+  weight         Float                 @default(1.0)
+  order          Int                   @default(0)
+  modelId        String
+  parentId       String?
+  idealStateText String?
+  lowStateText   String?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  model          EvaluationModel       @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  parent         Axis?                 @relation("AxisTree", fields: [parentId], references: [id])
+  children       Axis[]                @relation("AxisTree")
+  rubricLevels   AxisRubricLevel[]
+  mappings       QuestionAxisMapping[]
+  scores         ResultScore[]
+
+  @@map("axes")
+}
+
+model AxisRubricLevel {
+  id          String   @id @default(uuid())
+  axisId      String
+  level       Int
+  label       String
+  description String
+  embedding   Bytes?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  axis        Axis     @relation(fields: [axisId], references: [id], onDelete: Cascade)
+
+  @@unique([axisId, level])
+  @@map("axis_rubric_levels")
+}
+
+model Question {
+  id            String                @id @default(uuid())
+  text          String
+  type          QuestionType
+  scaleMin      Int?
+  scaleMax      Int?
+  scaleMinLabel String?
+  scaleMaxLabel String?
+  required      Boolean               @default(true)
+  order         Int                   @default(0)
+  modelId       String
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+  answerItems   AnswerItem[]
+  axisMappings  QuestionAxisMapping[]
+  criteria      QuestionCriteria[]
+  options       QuestionOption[]
+  model         EvaluationModel       @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  @@map("questions")
+}
+
+model QuestionCriteria {
+  id          String   @id @default(uuid())
+  questionId  String
+  level       Int
+  label       String
+  description String
+  embedding   Bytes?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  question    Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([questionId, level])
+  @@map("question_criteria")
+}
+
+model QuestionOption {
+  id             String   @id @default(uuid())
+  questionId     String
+  label          String
+  value          String
+  text           String
+  embedding      Bytes?
+  explicitWeight Float?
+  order          Int      @default(0)
+  createdAt      DateTime @default(now())
+  question       Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@map("question_options")
+}
+
+model QuestionAxisMapping {
+  id                 String   @id @default(uuid())
+  questionId         String
+  axisId             String
+  contributionWeight Float    @default(1.0)
+  createdAt          DateTime @default(now())
+  axis               Axis     @relation(fields: [axisId], references: [id], onDelete: Cascade)
+  question           Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([questionId, axisId])
+  @@map("question_axis_mappings")
+}
+
+model Session {
+  id              String          @id @default(uuid())
+  modelId         String
+  tenantId        String
+  userExternalId  String
+  status          SessionStatus   @default(STARTED)
+  startedAt       DateTime        @default(now())
+  completedAt     DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  questionIds     String[]        @default([])
+  outputFormatIds String[]        @default([])
+  answers         Answer[]
+  results         Result[]
+  model           EvaluationModel @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  tenant          Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model Answer {
+  id             String          @id @default(uuid())
+  modelId        String
+  sessionId      String?
+  respondentRef  String
+  respondentMeta Json?
+  status         AnswerStatus    @default(PENDING)
+  tenantId       String
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  items          AnswerItem[]
+  model          EvaluationModel @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  session        Session?        @relation(fields: [sessionId], references: [id])
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  results        Result[]
+
+  @@map("answers")
+}
+
+model AnswerItem {
+  id         String     @id @default(uuid())
+  answerId   String
+  questionId String
+  value      Json
+  createdAt  DateTime   @default(now())
+  answer     Answer     @relation(fields: [answerId], references: [id], onDelete: Cascade)
+  question   Question   @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  embedding  Embedding?
+
+  @@map("answer_items")
+}
+
+model Embedding {
+  id           String     @id @default(uuid())
+  answerItemId String     @unique
+  vector       Bytes
+  model        String
+  dimensions   Int
+  createdAt    DateTime   @default(now())
+  answerItem   AnswerItem @relation(fields: [answerItemId], references: [id], onDelete: Cascade)
+
+  @@map("embeddings")
+}
+
+model Result {
+  id              String          @id @default(uuid())
+  answerId        String
+  sessionId       String?
+  modelId         String
+  tenantId        String
+  modelVersion    Int             @default(1)
+  respondentRef   String
+  overallScore    Float
+  isLatest        Boolean         @default(true)
+  recommendations Json?
+  summary         String?
+  explanation     String?
+  resultType      String?
+  typeDetails     Json?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  scores          ResultScore[]
+  answer          Answer          @relation(fields: [answerId], references: [id], onDelete: Cascade)
+  model           EvaluationModel @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  session         Session?        @relation(fields: [sessionId], references: [id])
+  tenant          Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("results")
+}
+
+model ResultScore {
+  id              String   @id @default(uuid())
+  resultId        String
+  axisId          String
+  rawScore        Float
+  normalizedScore Float
+  rubricLevel     Float?
+  tendency        String?
+  details         Json?
+  createdAt       DateTime @default(now())
+  axis            Axis     @relation(fields: [axisId], references: [id], onDelete: Cascade)
+  result          Result   @relation(fields: [resultId], references: [id], onDelete: Cascade)
+
+  @@unique([resultId, axisId])
+  @@map("result_scores")
+}
+
+enum TenantPlan {
+  FREE
+  STARTER
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  TENANT_ADMIN
+  ANALYST
+  VIEWER
+  CLIENT
+}
+
+enum QuestionType {
+  SINGLE_CHOICE
+  MULTIPLE_CHOICE
+  FREE_TEXT
+  SCALE
+}
+
+enum AnswerStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum ModelStatus {
+  DRAFT
+  REVIEW
+  PUBLISHED
+  ARCHIVED
+}
+
+enum SessionStatus {
+  STARTED
+  ANSWERING
+  ANALYZING
+  COMPLETED
+  FAILED
+}

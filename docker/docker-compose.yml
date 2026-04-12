@@ -1,0 +1,88 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: evalengine-postgres
+    environment:
+      POSTGRES_USER: eval
+      POSTGRES_PASSWORD: eval
+      POSTGRES_DB: evalengine
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U eval -d evalengine"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - evalengine
+
+  redis:
+    image: redis:7-alpine
+    container_name: evalengine-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - evalengine
+
+  api:
+    build:
+      context: ../apps/api
+      dockerfile: Dockerfile
+    container_name: evalengine-api
+    environment:
+      DATABASE_URL: postgresql://eval:eval@postgres:5432/evalengine
+      REDIS_URL: redis://redis:6379
+    env_file:
+      - ../.env
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - evalengine
+
+  ai:
+    build:
+      context: ../apps/ai
+      dockerfile: Dockerfile
+    container_name: evalengine-ai
+    env_file:
+      - ../.env
+    ports:
+      - "8000:8000"
+    networks:
+      - evalengine
+
+  web:
+    build:
+      context: ../apps/web
+      dockerfile: Dockerfile
+    container_name: evalengine-web
+    env_file:
+      - ../.env
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    networks:
+      - evalengine
+
+volumes:
+  postgres_data:
+
+networks:
+  evalengine:
+    driver: bridge

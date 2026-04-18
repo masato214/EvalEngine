@@ -133,9 +133,10 @@ export default async function SessionDetailPage({ params }: { params: { sessionI
               const hasResult = answer.result ?? answer.analysisResult ?? answer.results?.length;
 
               return (
-                <div
+                <Link
                   key={answer.id}
-                  className="flex items-center gap-4 px-5 py-4 hover:bg-gray-50 transition-colors"
+                  href={`/answers/${params.sessionId}/results/${answer.id}`}
+                  className="flex items-center gap-4 px-5 py-4 hover:bg-gray-50 transition-colors group"
                 >
                   <span className="text-sm text-gray-400 w-6 flex-shrink-0">{i + 1}</span>
                   <div className="flex-1 min-w-0">
@@ -151,16 +152,11 @@ export default async function SessionDetailPage({ params }: { params: { sessionI
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${aStatusColor}`}>
                     {aStatusLabel}
                   </span>
-                  {hasResult && (
-                    <Link
-                      href={`/answers/${params.sessionId}/results/${answer.id}`}
-                      className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 flex-shrink-0"
-                    >
-                      <BarChart2 size={13} />
-                      分析結果
-                    </Link>
-                  )}
-                </div>
+                  <span className="flex items-center gap-1 text-xs text-blue-600 group-hover:text-blue-700 flex-shrink-0">
+                    <BarChart2 size={13} />
+                    {hasResult ? '回答・分析結果' : '回答内容'}
+                  </span>
+                </Link>
               );
             })}
           </div>

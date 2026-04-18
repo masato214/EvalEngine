@@ -196,8 +196,18 @@ def _score_item_sync(
         base_detail = ScoreDetail(
             score_method="embedding_rubric",
             selected_option_labels=item.selected_option_labels,
+            selected_option_scores=item.selected_option_scores,
             exclusive_option_selected=item.exclusive_option_selected,
         )
+
+        if item.selected_option_scores:
+            valid_scores = [max(0.0, min(1.0, float(s))) for s in item.selected_option_scores]
+            if valid_scores:
+                normalized = sum(valid_scores) / len(valid_scores)
+                rubric = 1.0 + normalized * 4.0
+                base_detail.score_method = "explicit_option_weight"
+                base_detail.quality_score = round(normalized, 4)
+                return normalized, rubric, base_detail
 
         # Exclusive-only selected → score 0
         if item.exclusive_option_selected and not item.selected_option_embeddings:

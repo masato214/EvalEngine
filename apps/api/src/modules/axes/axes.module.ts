@@ -5,10 +5,12 @@ import { AxesService } from './axes.service';
 
 @Module({
   imports: [
-    HttpModule.register({
-      baseURL: process.env.AI_SERVICE_URL ?? 'http://localhost:8000',
-      headers: { 'x-internal-key': process.env.AI_INTERNAL_KEY ?? '' },
-      timeout: 10000,
+    HttpModule.registerAsync({
+      useFactory: () => ({
+        baseURL: process.env.AI_SERVICE_URL ?? 'http://localhost:8000',
+        headers: { 'x-internal-key': process.env.AI_INTERNAL_KEY ?? '' },
+        timeout: 10000,
+      }),
     }),
   ],
   controllers: [AxesController],

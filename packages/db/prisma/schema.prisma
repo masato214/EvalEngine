@@ -86,6 +86,7 @@ model EvaluationModel {
   project        Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
   tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   outputFormats  OutputFormat[]
+  questionGroups QuestionGroup[]
   questions      Question[]
   resultTemplate ResultTemplate?
   results        Result[]
@@ -178,10 +179,50 @@ model Question {
   answerItems   AnswerItem[]
   axisMappings  QuestionAxisMapping[]
   criteria      QuestionCriteria[]
+  groupItems     QuestionGroupItem[]
   options       QuestionOption[]
   model         EvaluationModel       @relation(fields: [modelId], references: [id], onDelete: Cascade)
 
   @@map("questions")
+}
+
+model QuestionGroup {
+  id              String              @id @default(uuid())
+  modelId         String
+  name            String
+  description     String?
+  groupType       QuestionGroupType   @default(CUSTOM)
+  config          Json                @default("{}")
+  isActive        Boolean             @default(true)
+  order           Int                 @default(0)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  model           EvaluationModel     @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  items           QuestionGroupItem[]
+  sessions        Session[]
+
+  @@unique([modelId, name])
+  @@map("question_groups")
+}
+
+model QuestionGroupItem {
+  id                 String        @id @default(uuid())
+  groupId            String
+  questionId         String
+  displayText        String?
+  order              Int           @default(0)
+  block              String?
+  shuffleGroup       String?
+  required           Boolean       @default(true)
+  contributionWeight Float?
+  metadata           Json          @default("{}")
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  group              QuestionGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  question           Question      @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, questionId])
+  @@map("question_group_items")
 }
 
 model QuestionCriteria {
@@ -239,9 +280,11 @@ model Session {
   updatedAt       DateTime        @updatedAt
   questionIds     String[]        @default([])
   outputFormatIds String[]        @default([])
+  questionGroupId String?
   answers         Answer[]
   results         Result[]
   model           EvaluationModel @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  questionGroup   QuestionGroup?  @relation(fields: [questionGroupId], references: [id])
   tenant          Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("sessions")
@@ -354,6 +397,15 @@ enum QuestionType {
   MULTIPLE_CHOICE
   FREE_TEXT
   SCALE
+}
+
+enum QuestionGroupType {
+  FULL
+  COMPRESSED
+  BASELINE
+  DAILY
+  FINAL
+  CUSTOM
 }
 
 enum AnswerStatus {

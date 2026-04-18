@@ -20,6 +20,8 @@ class TestRunItemDto {
 
 class TestRunBody {
   @ApiProperty({ example: 'test-user-001', description: 'テスト回答者の識別子（任意文字列）' }) @IsString() respondentRef!: string;
+  @ApiPropertyOptional({ description: 'この質問グループに含まれる質問だけでテスト実行する' }) @IsOptional() @IsString() questionGroupId?: string;
+  @ApiPropertyOptional({ type: [String], description: '生成する出力形式ID。未指定なら全出力形式を生成する' }) @IsOptional() @IsArray() @IsString({ each: true }) outputFormatIds?: string[];
   @ApiProperty({ type: [TestRunItemDto] }) @IsArray() items!: TestRunItemDto[];
 }
 

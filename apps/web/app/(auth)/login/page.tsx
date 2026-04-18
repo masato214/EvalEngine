@@ -28,10 +28,10 @@ export default function LoginPage() {
       // ロールに応じてリダイレクト先を切り替え
       const session = await getSession();
       const role = (session as any)?.role;
-      if (role === 'CLIENT') {
-        router.push('/portal');
-      } else {
+      if (role === 'SUPER_ADMIN') {
         router.push('/dashboard');
+      } else {
+        router.push('/portal');
       }
     }
     setLoading(false);

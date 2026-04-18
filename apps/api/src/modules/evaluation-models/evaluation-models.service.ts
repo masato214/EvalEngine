@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { ModelStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PaginationDto } from '../../common/dto/pagination.dto';
@@ -40,7 +40,11 @@ export class EvaluationModelsService {
         skip,
         take: pageSize,
         orderBy: { createdAt: 'desc' },
-        include: { _count: { select: { axes: true, answers: true } } },
+        include: {
+          tenant: { select: { id: true, name: true, slug: true } },
+          project: { select: { id: true, name: true, tenantId: true } },
+          _count: { select: { axes: true, answers: true } },
+        },
       }),
       this.prisma.evaluationModel.count({ where }),
     ]);
@@ -133,6 +137,25 @@ export class EvaluationModelsService {
         },
         resultTemplate: true,
         outputFormats: { orderBy: { order: 'asc' } },
+        questionGroups: {
+          orderBy: { order: 'asc' },
+          include: {
+            items: {
+              orderBy: { order: 'asc' },
+              select: {
+                questionId: true,
+                displayText: true,
+                order: true,
+                block: true,
+                shuffleGroup: true,
+                required: true,
+                contributionWeight: true,
+                metadata: true,
+              },
+            },
+            _count: { select: { items: true, sessions: true } },
+          },
+        },
       },
     });
     if (!model) throw new NotFoundException('Evaluation model not found');
@@ -178,13 +201,23 @@ export class EvaluationModelsService {
   async testRun(
     id: string,
     tenantId: string | undefined,
-    dto: { respondentRef: string; items: { questionId: string; value: unknown }[] },
+    dto: {
+      respondentRef: string;
+      questionGroupId?: string;
+      outputFormatIds?: string[];
+      items: { questionId: string; value: unknown }[];
+    },
   ) {
     // ── 1. Load full model: all axes (flat) with rubric embeddings + question options ──
     const model = await this.prisma.evaluationModel.findFirst({
       where: tenantId ? { id, tenantId } : { id },
       include: {
         outputFormats: { orderBy: { order: 'asc' } },
+        questionGroups: {
+          include: {
+            items: { orderBy: { order: 'asc' }, select: { questionId: true } },
+          },
+        },
         axes: {
           orderBy: { order: 'asc' },
           include: {
@@ -205,7 +238,29 @@ export class EvaluationModelsService {
     });
     if (!model) throw new NotFoundException('Evaluation model not found');
 
+    const questionGroup = dto.questionGroupId
+      ? (model as any).questionGroups.find((group: any) => group.id === dto.questionGroupId)
+      : null;
+    if (dto.questionGroupId && !questionGroup) {
+      throw new BadRequestException('指定された質問グループがこの評価モデルに存在しません');
+    }
+    const groupQuestionIds = questionGroup
+      ? new Set((questionGroup.items ?? []).map((item: any) => item.questionId))
+      : null;
+    if (groupQuestionIds && dto.items.some((item) => !groupQuestionIds.has(item.questionId))) {
+      throw new BadRequestException('指定された質問グループに含まれない質問が送信されています');
+    }
+
+    const requestedOutputFormatIds = [...new Set(dto.outputFormatIds ?? [])];
+    const outputFormats = requestedOutputFormatIds.length > 0
+      ? ((model as any).outputFormats as any[]).filter((fmt) => requestedOutputFormatIds.includes(fmt.id))
+      : ((model as any).outputFormats as any[]);
+    if (requestedOutputFormatIds.length > 0 && outputFormats.length !== requestedOutputFormatIds.length) {
+      throw new BadRequestException('指定された出力形式がこの評価モデルに存在しません');
+    }
+
     const answerMap = new Map(dto.items.map((i) => [i.questionId, i.value]));
+    const submittedQuestionIds = new Set(dto.items.map((i) => i.questionId));
 
     // ── 2. Collect all unique questions across leaf axes ──────────────────────
     const questionMap = new Map<string, any>();
@@ -250,6 +305,7 @@ export class EvaluationModelsService {
 
       let selectedOptionEmbeddings: number[][] | undefined;
       let selectedOptionLabels: string[] = [];
+      let selectedOptionScores: number[] = [];
       let exclusiveOptionSelected = false;
 
       if (q.type === 'SINGLE_CHOICE' || q.type === 'MULTIPLE_CHOICE') {
@@ -262,6 +318,9 @@ export class EvaluationModelsService {
 
         const selectedOptions = (q.options as any[]).filter((o) => selected.includes(o.value));
         selectedOptionLabels = selectedOptions.map((o) => o.label ?? o.value);
+        selectedOptionScores = selectedOptions
+          .map((o) => (o.explicitWeight == null ? undefined : Number(o.explicitWeight)))
+          .filter((v): v is number => Number.isFinite(v));
 
         // Detect exclusive ("none of the above") options: explicitWeight <= 0
         // Convention: set explicitWeight = 0 on "特定のツールは使っていない" style options
@@ -296,6 +355,7 @@ export class EvaluationModelsService {
         embedding: q.type === 'FREE_TEXT' ? embeddingMap.get(qId) : undefined,
         selectedOptionEmbeddings,
         selectedOptionLabels,
+        selectedOptionScores,
         exclusiveOptionSelected,
         scaleMin: q.scaleMin ?? undefined,
         scaleMax: q.scaleMax ?? undefined,
@@ -380,7 +440,9 @@ export class EvaluationModelsService {
         const score = fas?.normalizedScore ?? 0;
         const rubricLevel = fas?.rubricLevel ?? (score > 0 ? 1 + score * 4 : 1.0);
 
-        const questionScores = axis.mappings.map((m: any) => {
+        const questionScores = axis.mappings
+          .filter((m: any) => submittedQuestionIds.has(m.question.id))
+          .map((m: any) => {
           const val = answerMap.get(m.question.id);
           const answered =
             val !== null &&
@@ -468,9 +530,9 @@ export class EvaluationModelsService {
 
     const formattedOutputs: Record<string, any> = {};
 
-    if (scoringItems.length > 0 && (model as any).outputFormats?.length > 0) {
+    if (scoringItems.length > 0 && outputFormats.length > 0) {
       await Promise.all(
-        ((model as any).outputFormats as any[]).map(async (fmt) => {
+        outputFormats.map(async (fmt) => {
           const result = await this.analysisService.generateFormatOutput({
             respondentRef: dto.respondentRef,
             overallScore,
@@ -490,6 +552,9 @@ export class EvaluationModelsService {
       modelId: id,
       modelName: model.name,
       respondentRef: dto.respondentRef,
+      questionGroupId: questionGroup?.id ?? null,
+      questionGroupName: questionGroup?.name ?? null,
+      outputFormatIds: outputFormats.map((fmt) => fmt.id),
       overallScore: Math.round(overallScore * 1000) / 1000,
       overallRubricLevel: Math.round(overallRubricLevel * 10) / 10,
       overallPercent,
@@ -498,9 +563,9 @@ export class EvaluationModelsService {
     };
   }
 
-  async snapshot(id: string, tenantId: string) {
+  async snapshot(id: string, tenantId: string | undefined) {
     const original = await this.prisma.evaluationModel.findFirst({
-      where: { id, tenantId },
+      where: tenantId ? { id, tenantId } : { id },
       include: {
         axes: {
           include: {

@@ -5,8 +5,11 @@ export const CurrentTenant = createParamDecorator(
   (_data: unknown, ctx: ExecutionContext): string | undefined => {
     const request = ctx.switchToHttp().getRequest<Request>();
     const user = (request as any).user;
-    // SUPER_ADMIN はテナント制限なし（全テナントのデータを参照可能）
-    if (user?.role === 'SUPER_ADMIN') return undefined;
+    // SUPER_ADMIN はテナント制限なし。x-tenant-id がある場合だけ対象テナントに切り替える。
+    if (user?.role === 'SUPER_ADMIN') {
+      const selectedTenantId = request.headers['x-tenant-id'];
+      return Array.isArray(selectedTenantId) ? selectedTenantId[0] : selectedTenantId;
+    }
     return user?.tenantId as string;
   },
 );

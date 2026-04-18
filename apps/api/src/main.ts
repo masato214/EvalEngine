@@ -36,7 +36,7 @@ EvalEngine は、企業向けカスタム評価・分析エンジンです。
 
 ### 認証方式
 - **JWT Bearer** — 管理ダッシュボードのログイン後に発行されるトークン。管理系エンドポイント（テナント・モデル管理など）に使用します。
-- **X-Api-Key** — テナントごとに発行するAPIキー。外部アプリからの回答送信に使用します。
+- **X-Api-Key + X-Tenant-Id** — テナントごとに発行するAPIキーとテナントID。外部アプリからのセッション作成・質問取得・回答送信・結果取得に使用します。
 
 ### 主なリソース
 | リソース | 説明 |
@@ -53,8 +53,10 @@ EvalEngine は、企業向けカスタム評価・分析エンジンです。
 ### 外部アプリからの回答送信フロー
 1. テナント管理画面でAPIキーを発行
 2. 評価モデルを \`PUBLISHED\` 状態に設定
-3. \`POST /api/v1/answers\` に \`X-Api-Key\` ヘッダーをつけて送信
-4. \`GET /api/v1/results\` でスコア結果を取得
+3. \`POST /api/v1/sessions\` に \`X-Api-Key\` と \`X-Tenant-Id\` ヘッダーをつけて回答セッションを作成
+4. \`GET /api/v1/sessions/{sessionId}/questions\` で質問・選択肢を取得
+5. \`POST /api/v1/sessions/{sessionId}/answers\` で回答を送信
+6. \`GET /api/v1/sessions/{sessionId}/result\` でスコア結果を取得
     `)
     .setVersion('1.0')
     .addBearerAuth(
@@ -64,6 +66,10 @@ EvalEngine は、企業向けカスタム評価・分析エンジンです。
     .addApiKey(
       { type: 'apiKey', name: 'x-api-key', in: 'header', description: '外部アプリ用APIキー（テナント管理画面で発行）' },
       'api-key',
+    )
+    .addApiKey(
+      { type: 'apiKey', name: 'x-tenant-id', in: 'header', description: '外部アプリ用テナントID' },
+      'tenant-id',
     )
     .build();
   const document = SwaggerModule.createDocument(app, config);

@@ -22,7 +22,10 @@ export class ProjectsService {
         skip,
         take: pageSize,
         orderBy: { createdAt: 'desc' },
-        include: { _count: { select: { evaluationModels: true } } },
+        include: {
+          tenant: { select: { id: true, name: true, slug: true } },
+          _count: { select: { evaluationModels: true } },
+        },
       }),
       this.prisma.project.count({ where }),
     ]);

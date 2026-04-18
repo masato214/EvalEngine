@@ -31,6 +31,7 @@ class ScoringItem(BaseModel):
     embedding: Optional[list[float]] = None              # FREE_TEXT answer embedding
     selected_option_embeddings: Optional[list[list[float]]] = None  # choice option embeddings
     selected_option_labels: list[str] = []               # display labels for selected options
+    selected_option_scores: list[float] = []             # direct normalized 0-1 scores
     exclusive_option_selected: bool = False              # "not using any tool" style option detected
     scale_min: Optional[int] = None
     scale_max: Optional[int] = None
@@ -66,6 +67,7 @@ class ScoreDetail(BaseModel):
 
     # ── For SINGLE/MULTIPLE_CHOICE ──────────────────────────────────────────
     selected_option_labels: list[str] = []
+    selected_option_scores: list[float] = []
     exclusive_option_selected: bool = False
     exclusive_filtered: bool = False   # True if exclusive was present but filtered out
 

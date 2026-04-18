@@ -72,6 +72,7 @@ export interface ScoringItem {
   // SINGLE_CHOICE / MULTIPLE_CHOICE: embeddings of the selected option(s)
   selectedOptionEmbeddings?: number[][];
   selectedOptionLabels?: string[];    // display labels for selected options
+  selectedOptionScores?: number[];    // normalized 0-1 direct scores from explicitWeight
   exclusiveOptionSelected?: boolean;  // "特定のツールは使っていない" style option detected
   scaleMin?: number;
   scaleMax?: number;
@@ -110,6 +111,7 @@ export interface ScoreDetail {
 
   // CHOICE
   selectedOptionLabels?: string[];
+  selectedOptionScores?: number[];
   exclusiveOptionSelected?: boolean;
   exclusiveFiltered?: boolean;
 

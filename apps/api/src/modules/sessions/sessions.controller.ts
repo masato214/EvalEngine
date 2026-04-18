@@ -12,6 +12,12 @@ import { CurrentTenant } from '../../common/decorators/current-tenant.decorator'
 class CreateSessionBody {
   @ApiProperty() @IsString() modelId!: string;
   @ApiProperty() @IsString() userExternalId!: string;
+  @ApiPropertyOptional({ description: '使用する質問グループID。指定した場合、そのグループに含まれる質問だけを配信します。' })
+  @IsOptional() @IsString() questionGroupId?: string;
+  @ApiPropertyOptional({ type: [String], description: 'このセッションで出題する質問ID。未指定の場合はモデル内の全質問を使用します。' })
+  @IsOptional() @IsArray() @IsString({ each: true }) questionIds?: string[];
+  @ApiPropertyOptional({ type: [String], description: 'このセッションで生成する出力形式ID。未指定の場合はモデル内の全出力形式を使用します。' })
+  @IsOptional() @IsArray() @IsString({ each: true }) outputFormatIds?: string[];
 }
 
 class AnswerItemDto {
@@ -50,6 +56,45 @@ export class SessionsController {
     @Query('modelId') modelId?: string,
   ) {
     return this.sessionsService.findAll(tenantId, modelId);
+  }
+
+  @Get('respondents/:ref/results')
+  @ApiSecurity('api-key')
+  @UseGuards(ApiKeyGuard)
+  @ApiOperation({ summary: '回答者別の結果履歴・成長度取得', description: '外部アプリからAPIキーで、ユーザーごとの時系列結果・前回差分・初回差分を取得します。' })
+  findRespondentResults(
+    @Param('ref') ref: string,
+    @CurrentTenant() tenantId: string,
+    @Query('modelId') modelId?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.sessionsService.findRespondentResults(tenantId, ref, modelId, from, to);
+  }
+
+  @Get('respondents/:ref/profile')
+  @ApiSecurity('api-key')
+  @UseGuards(ApiKeyGuard)
+  @ApiOperation({ summary: '回答者別の統合評価プロフィール取得', description: '複数の質問グループ/調査回の結果を軸単位で統合し、評価モデル全体の最新プロフィールを返します。' })
+  findRespondentProfile(
+    @Param('ref') ref: string,
+    @CurrentTenant() tenantId: string,
+    @Query('modelId') modelId: string,
+  ) {
+    return this.sessionsService.findRespondentProfile(tenantId, ref, modelId);
+  }
+
+  @Get('models/:modelId/aggregate')
+  @ApiSecurity('api-key')
+  @UseGuards(ApiKeyGuard)
+  @ApiOperation({ summary: '評価モデル全体の集計取得', description: '外部アプリからAPIキーで、モデル全体の平均・分布・軸別平均を取得します。' })
+  aggregateModelResults(
+    @Param('modelId') modelId: string,
+    @CurrentTenant() tenantId: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.sessionsService.aggregateModelResults(tenantId, modelId, from, to);
   }
 
   @Get(':id')

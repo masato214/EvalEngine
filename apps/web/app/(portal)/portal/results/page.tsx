@@ -2,23 +2,34 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { apiClient } from '@/lib/api-client';
 import Link from 'next/link';
-import { BarChart3, Users, TrendingUp, Calendar } from 'lucide-react';
+import { Users, TrendingUp, Building2 } from 'lucide-react';
 
-export default async function PortalResultsPage() {
+type PageProps = {
+  searchParams?: { tenantId?: string };
+};
+
+export default async function PortalResultsPage({ searchParams }: PageProps) {
   const session = await getServerSession(authOptions);
   const token = (session as any)?.accessToken ?? '';
+  const role = (session as any)?.role ?? '';
+  const selectedTenantId = role === 'SUPER_ADMIN' ? searchParams?.tenantId : undefined;
+  const tenantScope = selectedTenantId ? { tenantId: selectedTenantId } : undefined;
 
   let sessions: any[] = [];
   let results: any[] = [];
+  let tenants: any[] = [];
 
   await Promise.all([
-    apiClient.get('/sessions', token).then((r) => {
+    apiClient.get('/sessions', token, tenantScope).then((r) => {
       const d = r.data ?? r;
       sessions = Array.isArray(d) ? d : [];
     }).catch(() => {}),
-    apiClient.get('/results?pageSize=50', token).then((r) => {
+    apiClient.get('/results?pageSize=50', token, tenantScope).then((r) => {
       results = r.data ?? [];
     }).catch(() => {}),
+    role === 'SUPER_ADMIN'
+      ? apiClient.get('/tenants?pageSize=100', token).then((r) => { tenants = (r.data ?? []).filter((tenant: any) => tenant.id !== 'tenant-platform-admin'); }).catch(() => {})
+      : Promise.resolve(),
   ]);
 
   const sessionStatusLabels: Record<string, string> = {
@@ -38,8 +49,38 @@ export default async function PortalResultsPage() {
     <div className="max-w-5xl">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">結果・分析</h1>
-        <p className="text-sm text-gray-500 mt-1">セッション状況と評価結果を確認できます</p>
+        <p className="text-sm text-gray-500 mt-1">
+          {selectedTenantId ? '選択中のクライアントのセッション状況と評価結果を確認できます' : 'セッション状況と評価結果を確認できます'}
+        </p>
       </div>
+
+      {role === 'SUPER_ADMIN' && (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-6">
+          <div className="flex items-center gap-2 text-sm font-semibold text-gray-800 mb-3">
+            <Building2 size={16} className="text-indigo-500" />
+            クライアント表示
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/portal/results"
+              className={`rounded-lg px-3 py-2 text-xs border ${!selectedTenantId ? 'border-indigo-300 bg-indigo-50 text-indigo-700' : 'border-gray-100 text-gray-500 hover:bg-gray-50'}`}
+            >
+              全体
+            </Link>
+            {tenants.map((tenant) => (
+              <Link
+                key={tenant.id}
+                href={`/portal/results?tenantId=${encodeURIComponent(tenant.id)}`}
+                className={`rounded-lg px-3 py-2 text-xs border ${
+                  selectedTenantId === tenant.id ? 'border-indigo-300 bg-indigo-50 text-indigo-700' : 'border-gray-100 text-gray-500 hover:bg-gray-50'
+                }`}
+              >
+                {tenant.name}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Summary stats */}
       <div className="grid grid-cols-3 gap-4 mb-8">

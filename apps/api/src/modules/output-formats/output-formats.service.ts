@@ -15,10 +15,10 @@ export interface CreateOutputFormatDto {
 export class OutputFormatsService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll(modelId: string, tenantId: string) {
+  async findAll(modelId: string, tenantId: string | undefined) {
     // Verify model belongs to tenant
     const model = await this.prisma.evaluationModel.findFirst({
-      where: { id: modelId, tenantId },
+      where: tenantId ? { id: modelId, tenantId } : { id: modelId },
     });
     if (!model) throw new NotFoundException('Evaluation model not found');
 
@@ -28,9 +28,9 @@ export class OutputFormatsService {
     });
   }
 
-  async create(modelId: string, tenantId: string, dto: CreateOutputFormatDto) {
+  async create(modelId: string, tenantId: string | undefined, dto: CreateOutputFormatDto) {
     const model = await this.prisma.evaluationModel.findFirst({
-      where: { id: modelId, tenantId },
+      where: tenantId ? { id: modelId, tenantId } : { id: modelId },
     });
     if (!model) throw new NotFoundException('Evaluation model not found');
 
@@ -48,13 +48,13 @@ export class OutputFormatsService {
     });
   }
 
-  async update(id: string, tenantId: string, dto: Partial<CreateOutputFormatDto>) {
+  async update(id: string, tenantId: string | undefined, dto: Partial<CreateOutputFormatDto>) {
     const format = await this.prisma.outputFormat.findUnique({
       where: { id },
       include: { model: { select: { tenantId: true } } },
     });
     if (!format) throw new NotFoundException('Output format not found');
-    if (format.model.tenantId !== tenantId) throw new ForbiddenException();
+    if (tenantId && format.model.tenantId !== tenantId) throw new ForbiddenException();
 
     return this.prisma.outputFormat.update({
       where: { id },
@@ -62,13 +62,13 @@ export class OutputFormatsService {
     });
   }
 
-  async remove(id: string, tenantId: string) {
+  async remove(id: string, tenantId: string | undefined) {
     const format = await this.prisma.outputFormat.findUnique({
       where: { id },
       include: { model: { select: { tenantId: true } } },
     });
     if (!format) throw new NotFoundException('Output format not found');
-    if (format.model.tenantId !== tenantId) throw new ForbiddenException();
+    if (tenantId && format.model.tenantId !== tenantId) throw new ForbiddenException();
 
     return this.prisma.outputFormat.delete({ where: { id } });
   }

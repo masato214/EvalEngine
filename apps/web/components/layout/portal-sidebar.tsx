@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import {
   LayoutDashboard,
@@ -27,6 +27,9 @@ interface Props {
 
 export function PortalSidebar({ tenantName, role }: Props) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const selectedTenantId = searchParams.get('tenantId');
+  const withTenant = (href: string) => (selectedTenantId ? `${href}?tenantId=${encodeURIComponent(selectedTenantId)}` : href);
 
   return (
     <aside className="w-56 bg-white border-r border-gray-100 flex flex-col">
@@ -42,7 +45,7 @@ export function PortalSidebar({ tenantName, role }: Props) {
           return (
             <Link
               key={href}
-              href={href}
+              href={withTenant(href)}
               className={cn(
                 'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
                 isActive
@@ -56,7 +59,7 @@ export function PortalSidebar({ tenantName, role }: Props) {
           );
         })}
       </nav>
-      {role !== 'CLIENT' && (
+      {role === 'SUPER_ADMIN' && (
         <div className="p-3 border-t border-gray-100">
           <Link
             href="/dashboard"

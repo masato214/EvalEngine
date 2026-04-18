@@ -2,6 +2,5 @@
   "buildCommand": "pnpm turbo run build --filter=@evalengine/web...",
   "outputDirectory": "apps/web/.next",
   "installCommand": "pnpm install",
-  "framework": "nextjs",
-  "ignoreCommand": "git diff HEAD^ HEAD --quiet -- apps/web packages"
+  "framework": "nextjs"
 }

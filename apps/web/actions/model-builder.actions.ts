@@ -392,10 +392,110 @@ export async function deleteQuestionOption(modelId: string, questionId: string, 
   revalidatePath(`/evaluation-models/${modelId}`);
 }
 
+export async function createQuestionGroup(
+  modelId: string,
+  data: {
+    name: string;
+    description?: string;
+    groupType?: string;
+    order?: number;
+    isActive?: boolean;
+    config?: Record<string, unknown>;
+  },
+) {
+  const token = await getToken();
+  const res = await fetch(`${API}/evaluation-models/${modelId}/question-groups`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(err.message ?? '質問グループの作成に失敗しました');
+  }
+  const json = await res.json();
+  revalidatePath(`/evaluation-models/${modelId}`);
+  return json.data ?? json;
+}
+
+export async function updateQuestionGroup(
+  modelId: string,
+  groupId: string,
+  data: {
+    name?: string;
+    description?: string;
+    groupType?: string;
+    order?: number;
+    isActive?: boolean;
+    config?: Record<string, unknown>;
+  },
+) {
+  const token = await getToken();
+  const res = await fetch(`${API}/evaluation-models/${modelId}/question-groups/${groupId}`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(err.message ?? '質問グループの更新に失敗しました');
+  }
+  const json = await res.json();
+  revalidatePath(`/evaluation-models/${modelId}`);
+  return json.data ?? json;
+}
+
+export async function deleteQuestionGroup(modelId: string, groupId: string) {
+  const token = await getToken();
+  const res = await fetch(`${API}/evaluation-models/${modelId}/question-groups/${groupId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(err.message ?? '質問グループの削除に失敗しました');
+  }
+  revalidatePath(`/evaluation-models/${modelId}`);
+}
+
+export async function replaceQuestionGroupItems(
+  modelId: string,
+  groupId: string,
+  items: {
+    questionId: string;
+    displayText?: string;
+    order?: number;
+    block?: string;
+    shuffleGroup?: string;
+    required?: boolean;
+    contributionWeight?: number;
+    metadata?: Record<string, unknown>;
+  }[],
+) {
+  const token = await getToken();
+  const res = await fetch(`${API}/evaluation-models/${modelId}/question-groups/${groupId}/items`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ items }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(err.message ?? '質問グループの質問割当に失敗しました');
+  }
+  const json = await res.json();
+  revalidatePath(`/evaluation-models/${modelId}`);
+  return json.data ?? json;
+}
+
 // テスト実行（同期スコアリング）
 export async function testRunModel(
   modelId: string,
-  data: { respondentRef: string; items: { questionId: string; value: unknown }[] },
+  data: {
+    respondentRef: string;
+    questionGroupId?: string;
+    outputFormatIds?: string[];
+    items: { questionId: string; value: unknown }[];
+  },
 ) {
   const token = await getToken();
   const res = await fetch(`${API}/evaluation-models/${modelId}/test-run`, {

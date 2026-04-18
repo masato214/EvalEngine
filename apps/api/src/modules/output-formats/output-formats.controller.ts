@@ -7,13 +7,13 @@ import {
   Body,
   Param,
   UseGuards,
-  Request,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { IsString, IsOptional, IsNumber, IsObject, Min } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { OutputFormatsService } from './output-formats.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { CurrentTenant } from '../../common/decorators/current-tenant.decorator';
 
 class CreateOutputFormatBody {
   @ApiProperty() @IsString() name!: string;
@@ -33,8 +33,7 @@ export class OutputFormatsController {
   constructor(private outputFormatsService: OutputFormatsService) {}
 
   @Get()
-  findAll(@Param('modelId') modelId: string, @Request() req: any) {
-    const tenantId = req.user?.tenantId;
+  findAll(@Param('modelId') modelId: string, @CurrentTenant() tenantId: string | undefined) {
     return this.outputFormatsService.findAll(modelId, tenantId);
   }
 
@@ -42,9 +41,8 @@ export class OutputFormatsController {
   create(
     @Param('modelId') modelId: string,
     @Body() dto: CreateOutputFormatBody,
-    @Request() req: any,
+    @CurrentTenant() tenantId: string | undefined,
   ) {
-    const tenantId = req.user?.tenantId;
     return this.outputFormatsService.create(modelId, tenantId, dto);
   }
 
@@ -52,15 +50,13 @@ export class OutputFormatsController {
   update(
     @Param('id') id: string,
     @Body() dto: Partial<CreateOutputFormatBody>,
-    @Request() req: any,
+    @CurrentTenant() tenantId: string | undefined,
   ) {
-    const tenantId = req.user?.tenantId;
     return this.outputFormatsService.update(id, tenantId, dto);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string, @Request() req: any) {
-    const tenantId = req.user?.tenantId;
+  remove(@Param('id') id: string, @CurrentTenant() tenantId: string | undefined) {
     return this.outputFormatsService.remove(id, tenantId);
   }
 }

@@ -6,11 +6,11 @@ import { PaginationDto } from '../../common/dto/pagination.dto';
 export class ResultsService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll(tenantId: string, pagination: PaginationDto, modelId?: string, latestOnly = true) {
+  async findAll(tenantId: string | undefined, pagination: PaginationDto, modelId?: string, latestOnly = true) {
     const { page, pageSize } = pagination;
     const skip = (page - 1) * pageSize;
     const where = {
-      tenantId,
+      ...(tenantId ? { tenantId } : {}),
       ...(modelId ? { modelId } : {}),
       ...(latestOnly ? { isLatest: true } : {}),
     };
@@ -21,7 +21,18 @@ export class ResultsService {
         skip,
         take: pageSize,
         orderBy: { createdAt: 'desc' },
-        include: { scores: { include: { axis: { select: { id: true, name: true } } } } },
+        include: {
+          tenant: { select: { id: true, name: true, slug: true } },
+          model: {
+            select: {
+              id: true,
+              name: true,
+              projectId: true,
+              project: { select: { id: true, name: true, tenantId: true } },
+            },
+          },
+          scores: { include: { axis: { select: { id: true, name: true } } } },
+        },
       }),
       this.prisma.result.count({ where }),
     ]);
@@ -32,9 +43,9 @@ export class ResultsService {
     };
   }
 
-  async findOne(id: string, tenantId: string) {
+  async findOne(id: string, tenantId: string | undefined) {
     const result = await this.prisma.result.findFirst({
-      where: { id, tenantId },
+      where: tenantId ? { id, tenantId } : { id },
       include: {
         scores: { include: { axis: { select: { id: true, name: true } } } },
         answer: { include: { items: true } },
@@ -44,9 +55,9 @@ export class ResultsService {
     return this._format(result);
   }
 
-  async findByRespondent(respondentRef: string, tenantId: string) {
+  async findByRespondent(respondentRef: string, tenantId: string | undefined) {
     const results = await this.prisma.result.findMany({
-      where: { respondentRef, tenantId, isLatest: true },
+      where: { respondentRef, ...(tenantId ? { tenantId } : {}), isLatest: true },
       orderBy: { createdAt: 'desc' },
       include: { scores: { include: { axis: { select: { id: true, name: true } } } } },
     });
@@ -54,6 +65,7 @@ export class ResultsService {
   }
 
   private _format(result: any) {
+    const details = result.typeDetails && typeof result.typeDetails === 'object' ? result.typeDetails : {};
     return {
       id: result.id,
       answerId: result.answerId,
@@ -65,6 +77,8 @@ export class ResultsService {
       isLatest: result.isLatest,
       resultType: result.resultType ?? null,
       typeDetails: result.typeDetails ?? null,
+      formattedOutputs: (details as any).formattedOutputs ?? {},
+      outputViews: (details as any).outputViews ?? [],
       summary: result.summary ?? null,
       explanation: result.explanation ?? null,
       recommendations: result.recommendations ?? [],
@@ -78,6 +92,8 @@ export class ResultsService {
         details: s.details ?? null,
       })),
       tenantId: result.tenantId,
+      tenant: result.tenant ?? null,
+      model: result.model ?? null,
       createdAt: result.createdAt,
     };
   }

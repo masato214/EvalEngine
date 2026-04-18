@@ -11,8 +11,8 @@ export default async function TenantsPage() {
 
   let tenants: TenantDto[] = [];
   try {
-    const res = await apiClient.get('/tenants', token);
-    tenants = res.data ?? [];
+    const res = await apiClient.get('/tenants?pageSize=100', token);
+    tenants = (res.data ?? []).filter((tenant: any) => tenant.id !== 'tenant-platform-admin');
   } catch {}
 
   return (

@@ -2,20 +2,32 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { apiClient } from '@/lib/api-client';
 import Link from 'next/link';
-import { Brain, BarChart3, CheckCircle, Clock, AlertCircle, TrendingUp, Users, ArrowRight } from 'lucide-react';
+import { Brain, BarChart3, CheckCircle, Clock, TrendingUp, Users, ArrowRight, Building2 } from 'lucide-react';
 
-export default async function PortalHomePage() {
+type PageProps = {
+  searchParams?: { tenantId?: string };
+};
+
+export default async function PortalHomePage({ searchParams }: PageProps) {
   const session = await getServerSession(authOptions);
   const token = (session as any)?.accessToken ?? '';
+  const role = (session as any)?.role ?? '';
+  const selectedTenantId = role === 'SUPER_ADMIN' ? searchParams?.tenantId : undefined;
+  const tenantScope = selectedTenantId ? { tenantId: selectedTenantId } : undefined;
+  const scopeQuery = selectedTenantId ? `?tenantId=${encodeURIComponent(selectedTenantId)}` : '';
 
   let models: any[] = [];
   let sessions: any[] = [];
   let results: any[] = [];
+  let tenants: any[] = [];
 
   await Promise.all([
-    apiClient.get('/evaluation-models?pageSize=100', token).then((r) => { models = r.data ?? []; }).catch(() => {}),
-    apiClient.get('/sessions', token).then((r) => { const d = r.data ?? r; sessions = Array.isArray(d) ? d : []; }).catch(() => {}),
-    apiClient.get('/results?pageSize=5', token).then((r) => { results = r.data ?? []; }).catch(() => {}),
+    apiClient.get('/evaluation-models?pageSize=100', token, tenantScope).then((r) => { models = r.data ?? []; }).catch(() => {}),
+    apiClient.get('/sessions', token, tenantScope).then((r) => { const d = r.data ?? r; sessions = Array.isArray(d) ? d : []; }).catch(() => {}),
+    apiClient.get('/results?pageSize=5', token, tenantScope).then((r) => { results = r.data ?? []; }).catch(() => {}),
+    role === 'SUPER_ADMIN'
+      ? apiClient.get('/tenants?pageSize=100', token).then((r) => { tenants = (r.data ?? []).filter((tenant: any) => tenant.id !== 'tenant-platform-admin'); }).catch(() => {})
+      : Promise.resolve(),
   ]);
 
   const publishedModels = models.filter((m) => m.status === 'PUBLISHED');
@@ -28,8 +40,48 @@ export default async function PortalHomePage() {
       {/* Welcome */}
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">ポータルホーム</h1>
-        <p className="text-sm text-gray-500 mt-1">評価モデルの管理、回答状況の確認、結果の閲覧ができます</p>
+        <p className="text-sm text-gray-500 mt-1">
+          {selectedTenantId ? '選択中のクライアントの評価モデル、回答状況、結果を確認できます' : '評価モデルの管理、回答状況の確認、結果の閲覧ができます'}
+        </p>
       </div>
+
+      {role === 'SUPER_ADMIN' && (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 mb-8">
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <div>
+              <div className="flex items-center gap-2 text-sm font-semibold text-gray-800">
+                <Building2 size={16} className="text-indigo-500" />
+                クライアント選択
+              </div>
+              <p className="text-xs text-gray-400 mt-1">
+                {selectedTenantId ? 'このクライアントのポータルに切り替え中です' : 'クライアントを選ぶと、その会社のポータル画面に切り替わります'}
+              </p>
+            </div>
+            {selectedTenantId && (
+              <Link href="/portal" className="text-xs text-gray-500 hover:text-gray-700">
+                全体表示に戻す
+              </Link>
+            )}
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {tenants.map((tenant) => {
+              const active = tenant.id === selectedTenantId;
+              return (
+                <Link
+                  key={tenant.id}
+                  href={`/portal?tenantId=${encodeURIComponent(tenant.id)}`}
+                  className={`rounded-lg border px-4 py-3 transition-colors ${
+                    active ? 'border-indigo-300 bg-indigo-50' : 'border-gray-100 hover:border-indigo-200 hover:bg-gray-50'
+                  }`}
+                >
+                  <p className="text-sm font-medium text-gray-900 truncate">{tenant.name}</p>
+                  <p className="text-xs text-gray-400 mt-0.5 truncate">{tenant.id}</p>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -38,28 +90,28 @@ export default async function PortalHomePage() {
           value={publishedModels.length}
           icon={<CheckCircle size={18} className="text-green-500" />}
           color="bg-green-50"
-          href="/portal/models"
+          href={`/portal/models${scopeQuery}`}
         />
         <StatCard
           label="下書きモデル"
           value={draftModels.length}
           icon={<Clock size={18} className="text-gray-400" />}
           color="bg-gray-50"
-          href="/portal/models"
+          href={`/portal/models${scopeQuery}`}
         />
         <StatCard
           label="受付中セッション"
           value={activeSessions.length}
           icon={<Users size={18} className="text-blue-500" />}
           color="bg-blue-50"
-          href="/portal/results"
+          href={`/portal/results${scopeQuery}`}
         />
         <StatCard
           label="完了セッション"
           value={completedSessions.length}
           icon={<TrendingUp size={18} className="text-purple-500" />}
           color="bg-purple-50"
-          href="/portal/results"
+          href={`/portal/results${scopeQuery}`}
         />
       </div>
 
@@ -71,7 +123,7 @@ export default async function PortalHomePage() {
               <Brain size={16} className="text-indigo-500" />
               <h2 className="text-sm font-semibold text-gray-800">評価モデル</h2>
             </div>
-            <Link href="/portal/models" className="text-xs text-indigo-600 hover:underline flex items-center gap-1">
+            <Link href={`/portal/models${scopeQuery}`} className="text-xs text-indigo-600 hover:underline flex items-center gap-1">
               すべて見る <ArrowRight size={11} />
             </Link>
           </div>
@@ -82,7 +134,7 @@ export default async function PortalHomePage() {
               {models.slice(0, 5).map((m) => (
                 <Link
                   key={m.id}
-                  href={`/evaluation-models/${m.id}`}
+                  href={role === 'SUPER_ADMIN' ? `/evaluation-models/${m.id}` : `/portal/models${scopeQuery}`}
                   className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors group"
                 >
                   <div className="flex-1 min-w-0">
@@ -96,12 +148,16 @@ export default async function PortalHomePage() {
             </div>
           )}
           <div className="px-5 py-3 border-t border-gray-50">
-            <Link
-              href="/evaluation-models/new"
-              className="text-xs text-indigo-600 hover:underline"
-            >
-              + 新規評価モデルを作成
-            </Link>
+            {role === 'SUPER_ADMIN' ? (
+              <Link
+                href="/evaluation-models/new"
+                className="text-xs text-indigo-600 hover:underline"
+              >
+                + 新規評価モデルを作成
+              </Link>
+            ) : (
+              <span className="text-xs text-gray-400">管理者が評価モデルを設定します</span>
+            )}
           </div>
         </div>
 
@@ -112,7 +168,7 @@ export default async function PortalHomePage() {
               <BarChart3 size={16} className="text-purple-500" />
               <h2 className="text-sm font-semibold text-gray-800">最近の結果</h2>
             </div>
-            <Link href="/portal/results" className="text-xs text-purple-600 hover:underline flex items-center gap-1">
+            <Link href={`/portal/results${scopeQuery}`} className="text-xs text-purple-600 hover:underline flex items-center gap-1">
               すべて見る <ArrowRight size={11} />
             </Link>
           </div>

@@ -8,9 +8,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const session = await getServerSession(authOptions);
   if (!session) redirect('/login');
 
-  // CLIENTロールは管理ダッシュボードに入れない → ポータルへ
   const role = (session as any)?.role;
-  if (role === 'CLIENT') redirect('/portal');
+  if (role !== 'SUPER_ADMIN') redirect('/portal');
 
   return (
     <div className="flex h-screen">

@@ -19,6 +19,38 @@ function decodeEmbedding(buf: Buffer | Uint8Array | null | undefined): number[] 
   return Array.from(floats);
 }
 
+function buildOutputViews(outputFormats: any[], formattedOutputs: Record<string, any>) {
+  return outputFormats.map((format) => ({
+    id: format.id,
+    name: format.name,
+    description: format.description ?? null,
+    outputType: format.outputType,
+    order: format.order ?? 0,
+    display: {
+      version: 1,
+      component: outputTypeComponent(format.outputType),
+      layout: 'report',
+      sections: outputTypeSections(format.outputType),
+      config: format.config ?? {},
+    },
+    data: formattedOutputs[format.id] ?? null,
+  }));
+}
+
+function outputTypeComponent(outputType: string) {
+  if (outputType === 'TYPE_CLASSIFICATION') return 'type-classification-card';
+  if (outputType === 'SKILL_GAP') return 'skill-gap-report';
+  if (outputType === 'TENDENCY_MAP') return 'tendency-map';
+  return 'custom-report';
+}
+
+function outputTypeSections(outputType: string) {
+  if (outputType === 'TYPE_CLASSIFICATION') return ['type_label', 'type_description', 'strengths', 'growth_areas', 'all_types_matched'];
+  if (outputType === 'SKILL_GAP') return ['summary', 'gaps', 'priority_action'];
+  if (outputType === 'TENDENCY_MAP') return ['pattern_label', 'pattern_description', 'axis_interpretations', 'behavioral_implications'];
+  return ['summary', 'hiring_decision', 'role_fits', 'development_plan'];
+}
+
 @Processor(QUEUE_NAMES.ANALYSIS)
 export class AnalysisProcessor extends WorkerHost {
   private readonly logger = new Logger(AnalysisProcessor.name);
@@ -60,8 +92,10 @@ export class AnalysisProcessor extends WorkerHost {
           model: {
             include: {
               axes: { include: { rubricLevels: true } },
+              outputFormats: { orderBy: { order: 'asc' } },
             },
           },
+          session: { select: { outputFormatIds: true } },
         },
       });
 
@@ -126,6 +160,8 @@ export class AnalysisProcessor extends WorkerHost {
 
         // For choice questions: find selected option embeddings
         let selectedOptionEmbeddings: number[][] | undefined;
+        let selectedOptionLabels: string[] = [];
+        let selectedOptionScores: number[] = [];
         if (qType === 'SINGLE_CHOICE' || qType === 'MULTIPLE_CHOICE') {
           const rawVal = item.value;
           const selected: string[] =
@@ -141,6 +177,11 @@ export class AnalysisProcessor extends WorkerHost {
             .filter((v): v is number[] => v !== undefined);
 
           if (selectedEmbeds.length > 0) selectedOptionEmbeddings = selectedEmbeds;
+          const selectedOptions = q.options.filter((opt) => selected.includes(opt.value));
+          selectedOptionLabels = selectedOptions.map((opt) => opt.label ?? opt.value);
+          selectedOptionScores = selectedOptions
+            .map((opt) => (opt.explicitWeight == null ? undefined : Number(opt.explicitWeight)))
+            .filter((v): v is number => Number.isFinite(v));
         }
 
         return {
@@ -149,6 +190,8 @@ export class AnalysisProcessor extends WorkerHost {
           value: item.value,
           embedding: qType === 'FREE_TEXT' ? embeddingMap.get(item.id) : undefined,
           selectedOptionEmbeddings,
+          selectedOptionLabels,
+          selectedOptionScores,
           scaleMin: q.scaleMin ?? undefined,
           scaleMax: q.scaleMax ?? undefined,
           axisMappings: q.axisMappings.map((m) => ({
@@ -208,6 +251,40 @@ export class AnalysisProcessor extends WorkerHost {
         this.logger.warn(`Explanation generation failed: ${err}`);
       }
 
+      const axisScoresForOutput = axisScores.map((s) => ({
+        axisName: axisNameMap.get(s.axisId) as string ?? s.axisId,
+        normalizedScore: s.normalizedScore,
+        rubricLevel: s.rubricLevel ?? null,
+        percent: Math.round(s.normalizedScore * 100),
+      }));
+      const overallPercent = Math.round(overallScore * 100);
+      const formattedOutputs: Record<string, any> = {};
+
+      const sessionOutputFormatIds = answer.session?.outputFormatIds ?? [];
+      const outputFormats = sessionOutputFormatIds.length > 0
+        ? ((answer.model as any).outputFormats ?? []).filter((fmt: any) => sessionOutputFormatIds.includes(fmt.id))
+        : ((answer.model as any).outputFormats ?? []);
+
+      if (outputFormats.length > 0) {
+        await Promise.all(
+          (outputFormats as any[]).map(async (fmt) => {
+            const result = await this.analysisService.generateFormatOutput({
+              respondentRef: answer.respondentRef,
+              overallScore,
+              overallPercent,
+              axisScores: axisScoresForOutput,
+              outputType: fmt.outputType,
+              formatName: fmt.name,
+              config: fmt.config,
+              promptTemplate: fmt.promptTemplate,
+            });
+            if (result) formattedOutputs[fmt.id] = result;
+          }),
+        );
+      }
+
+      const outputViews = buildOutputViews(outputFormats, formattedOutputs);
+
       // ── Mark previous results as not latest ───────────────────────────────
       await this.prisma.result.updateMany({
         where: { answerId, isLatest: true },
@@ -228,6 +305,10 @@ export class AnalysisProcessor extends WorkerHost {
           summary,
           explanation,
           recommendations,
+          typeDetails: {
+            formattedOutputs,
+            outputViews,
+          },
           scores: {
             create: axisScores.map((s) => ({
               axisId: s.axisId,

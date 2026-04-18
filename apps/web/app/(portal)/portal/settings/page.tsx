@@ -7,6 +7,8 @@ import { Users, KeyRound, ExternalLink, ChevronRight } from 'lucide-react';
 export default async function PortalSettingsPage() {
   const session = await getServerSession(authOptions);
   const token = (session as any)?.accessToken ?? '';
+  const role = (session as any)?.role ?? '';
+  const isSuperAdmin = role === 'SUPER_ADMIN';
 
   let users: any[] = [];
   let apiKeys: any[] = [];
@@ -34,9 +36,11 @@ export default async function PortalSettingsPage() {
               <h2 className="text-sm font-semibold text-gray-800">ユーザー管理</h2>
               <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{users.length}人</span>
             </div>
-            <Link href="/users" className="flex items-center gap-1 text-xs text-indigo-600 hover:underline">
-              詳細管理 <ExternalLink size={11} />
-            </Link>
+            {isSuperAdmin && (
+              <Link href="/users" className="flex items-center gap-1 text-xs text-indigo-600 hover:underline">
+                詳細管理 <ExternalLink size={11} />
+              </Link>
+            )}
           </div>
           <div className="divide-y divide-gray-50">
             {users.slice(0, 5).map((u: any) => (
@@ -70,9 +74,11 @@ export default async function PortalSettingsPage() {
               <h2 className="text-sm font-semibold text-gray-800">APIキー</h2>
               <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{activeKeys.length}件有効</span>
             </div>
-            <Link href="/api-keys" className="flex items-center gap-1 text-xs text-indigo-600 hover:underline">
-              管理 <ExternalLink size={11} />
-            </Link>
+            {isSuperAdmin && (
+              <Link href="/api-keys" className="flex items-center gap-1 text-xs text-indigo-600 hover:underline">
+                管理 <ExternalLink size={11} />
+              </Link>
+            )}
           </div>
           <div className="divide-y divide-gray-50">
             {apiKeys.slice(0, 5).map((k: any) => (
@@ -92,9 +98,11 @@ export default async function PortalSettingsPage() {
             {apiKeys.length === 0 && (
               <div className="px-5 py-6 text-center text-gray-400 text-sm">
                 APIキーがありません<br />
-                <Link href="/api-keys" className="text-indigo-600 text-xs hover:underline mt-1 inline-block">
-                  APIキーを発行する →
-                </Link>
+                {isSuperAdmin && (
+                  <Link href="/api-keys" className="text-indigo-600 text-xs hover:underline mt-1 inline-block">
+                    APIキーを発行する →
+                  </Link>
+                )}
               </div>
             )}
           </div>
@@ -105,9 +113,13 @@ export default async function PortalSettingsPage() {
           <h2 className="text-sm font-semibold text-gray-800 mb-3">クイックリンク</h2>
           <div className="space-y-2">
             {[
-              { label: 'Swagger API ドキュメント', href: 'http://localhost:3001/api/docs', external: true },
-              { label: 'ユーザー管理', href: '/users', external: false },
-              { label: 'APIキー管理', href: '/api-keys', external: false },
+              { label: 'Swagger API ドキュメント', href: 'http://localhost:3003/api/docs', external: true },
+              ...(isSuperAdmin
+                ? [
+                    { label: 'ユーザー管理', href: '/users', external: false },
+                    { label: 'APIキー管理', href: '/api-keys', external: false },
+                  ]
+                : []),
             ].map((item) => (
               <Link
                 key={item.href}

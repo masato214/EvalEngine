@@ -6,6 +6,6 @@ export default async function Home() {
   const session = await getServerSession(authOptions);
   if (!session) redirect('/login');
   const role = (session as any)?.role;
-  if (role === 'CLIENT') redirect('/portal');
-  redirect('/dashboard');
+  if (role === 'SUPER_ADMIN') redirect('/dashboard');
+  redirect('/portal');
 }

@@ -28,6 +28,23 @@ interface OutputFormat {
   promptTemplate?: string;
 }
 
+interface QuestionGroup {
+  id: string;
+  name: string;
+  description?: string;
+  groupType: string;
+  isActive?: boolean;
+  items?: {
+    questionId: string;
+    displayText?: string | null;
+    order: number;
+    block?: string | null;
+    shuffleGroup?: string | null;
+    required?: boolean;
+  }[];
+  _count?: { items?: number; sessions?: number };
+}
+
 interface TestResult {
   modelName: string;
   overallScore: number;
@@ -948,45 +965,73 @@ export function TestClient({
   modelId,
   questions,
   outputFormats = [],
+  questionGroups = [],
 }: {
   modelId: string;
   questions: Question[];
   outputFormats?: OutputFormat[];
+  questionGroups?: QuestionGroup[];
 }) {
   const [answers, setAnswers] = useState<Record<string, unknown>>({});
   const [respondentRef, setRespondentRef] = useState('test-user-001');
   const [result, setResult] = useState<TestResult | null>(null);
   const [error, setError] = useState('');
   const [isPending, startTransition] = useTransition();
+  const defaultGroup = questionGroups.find((group) => group.groupType === 'FULL') ?? questionGroups[0] ?? null;
+  const [selectedQuestionGroupId, setSelectedQuestionGroupId] = useState<string>(defaultGroup?.id ?? '');
   const [selectedFormatId, setSelectedFormatId] = useState<string | null>(
     outputFormats.length > 0 ? outputFormats[0].id : null,
   );
   const [showCoords, setShowCoords] = useState(false);
 
   const selectedFormat = outputFormats.find((f) => f.id === selectedFormatId) ?? null;
+  const selectedQuestionGroup = questionGroups.find((group) => group.id === selectedQuestionGroupId) ?? null;
+  const questionById = new Map(questions.map((question) => [question.id, question]));
+  const activeQuestions = selectedQuestionGroup
+    ? [...(selectedQuestionGroup.items ?? [])]
+        .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+        .map((item) => {
+          const question = questionById.get(item.questionId);
+          if (!question) return null;
+          return {
+            ...question,
+            text: item.displayText || question.text,
+            required: item.required ?? question.required,
+            groupItem: item,
+          };
+        })
+        .filter(Boolean) as Question[]
+    : questions;
 
   // Group questions by top-level axis
   const grouped: { breadcrumb: string; questions: Question[] }[] = [];
-  for (const q of questions) {
+  for (const q of activeQuestions) {
     const key = q.axisBreadcrumb[0] ?? q.axisName;
     const existing = grouped.find((g) => g.breadcrumb === key);
     if (existing) existing.questions.push(q);
     else grouped.push({ breadcrumb: key, questions: [q] });
   }
 
-  const answeredCount = Object.keys(answers).filter((k) => {
-    const v = answers[k];
+  const activeQuestionIds = new Set(activeQuestions.map((question) => question.id));
+  const answeredCount = Object.keys(answers).filter((questionId) => {
+    if (!activeQuestionIds.has(questionId)) return false;
+    const v = answers[questionId];
     return v !== undefined && v !== '' && !(Array.isArray(v) && v.length === 0);
   }).length;
-  const totalCount = questions.length;
+  const totalCount = activeQuestions.length;
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
-    const items = questions.map((q) => ({ questionId: q.id, value: answers[q.id] ?? null }));
+    const items = activeQuestions.map((q) => ({ questionId: q.id, value: answers[q.id] ?? null }));
     startTransition(async () => {
       try {
-        const res = await testRunModel(modelId, { respondentRef, items });
+        const res = await testRunModel(modelId, {
+          respondentRef,
+          questionGroupId: selectedQuestionGroup?.id,
+          outputFormatIds: selectedFormatId ? [selectedFormatId] : undefined,
+          items,
+        });
         setResult(res);
       } catch (e: any) {
         setError(e.message);
@@ -1040,6 +1085,32 @@ export function TestClient({
       <div className="lg:col-span-3">
         <form onSubmit={handleSubmit}>
           <div className="space-y-6">
+            {questionGroups.length > 0 && (
+              <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  実行する質問グループ
+                </label>
+                <select
+                  value={selectedQuestionGroupId}
+                  onChange={(e) => {
+                    setSelectedQuestionGroupId(e.target.value);
+                    setResult(null);
+                    setError('');
+                  }}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {questionGroups.map((group) => (
+                    <option key={group.id} value={group.id}>
+                      {group.name} / {group.groupType} / {group._count?.items ?? group.items?.length ?? 0}問
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-400 mt-1">
+                  選択した質問グループの質問だけを使ってテストします。テスト実行APIにもこの questionGroupId を渡します。
+                </p>
+              </div>
+            )}
+
             {/* Respondent ID */}
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1056,6 +1127,13 @@ export function TestClient({
             </div>
 
             {/* Questions by group */}
+            {grouped.length === 0 && (
+              <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-8 text-center">
+                <p className="text-sm text-gray-400">この質問グループには質問が割り当てられていません。</p>
+                <p className="text-xs text-gray-400 mt-1">評価モデル詳細の「質問グループ」タブで質問を割り当ててください。</p>
+              </div>
+            )}
+
             {grouped.map((group) => (
               <div key={group.breadcrumb} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
                 <div className="px-5 py-3 bg-gray-50 border-b border-gray-100">
@@ -1096,7 +1174,7 @@ export function TestClient({
             <div className="flex items-center gap-3">
               <button
                 type="submit"
-                disabled={isPending}
+                disabled={isPending || totalCount === 0}
                 className="flex items-center gap-2 bg-blue-600 text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
               >
                 <Play size={14} />

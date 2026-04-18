@@ -61,6 +61,7 @@ export class AnalysisService {
         embedding: item.embedding ?? null,
         selected_option_embeddings: item.selectedOptionEmbeddings ?? null,
         selected_option_labels: (item as any).selectedOptionLabels ?? [],
+        selected_option_scores: (item as any).selectedOptionScores ?? [],
         exclusive_option_selected: (item as any).exclusiveOptionSelected ?? false,
         scale_min: item.scaleMin ?? null,
         scale_max: item.scaleMax ?? null,
@@ -93,6 +94,7 @@ export class AnalysisService {
       return {
         scoreMethod: d.score_method,
         selectedOptionLabels: d.selected_option_labels ?? [],
+        selectedOptionScores: d.selected_option_scores ?? [],
         exclusiveOptionSelected: d.exclusive_option_selected ?? false,
         exclusiveFiltered: d.exclusive_filtered ?? false,
         rubricSimilarities: (d.rubric_similarities ?? []).map((rs: any) => ({

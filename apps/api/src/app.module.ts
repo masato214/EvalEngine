@@ -17,6 +17,7 @@ import { AnalysisModule } from './modules/analysis/analysis.module';
 import { ApiKeysModule } from './modules/api-keys/api-keys.module';
 import { SessionsModule } from './modules/sessions/sessions.module';
 import { OutputFormatsModule } from './modules/output-formats/output-formats.module';
+import { QuestionGroupsModule } from './modules/question-groups/question-groups.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { OutputFormatsModule } from './modules/output-formats/output-formats.mod
     ResultsModule,
     AnalysisModule,
     OutputFormatsModule,
+    QuestionGroupsModule,
   ],
   controllers: [AppController],
 })

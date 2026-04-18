@@ -31,6 +31,7 @@ export default async function ModelDetailPage({ params }: { params: { id: string
   const status = STATUS_LABELS[model.status] ?? { label: model.status, color: 'text-gray-500 bg-gray-100' };
   const projectId = model.projectId;
   const outputFormats = model.outputFormats ?? [];
+  const questionGroups = model.questionGroups ?? [];
 
   return (
     <div>
@@ -72,6 +73,7 @@ export default async function ModelDetailPage({ params }: { params: { id: string
         modelId={model.id}
         axes={model.axes ?? []}
         outputFormats={outputFormats}
+        questionGroups={questionGroups}
         model={model}
       />
     </div>

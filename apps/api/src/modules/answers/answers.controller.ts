@@ -31,7 +31,7 @@ export class AnswersController {
   @UseGuards(ApiKeyGuard)
   @ApiOperation({
     summary: '回答を送信',
-    description: `外部アプリからAPIキーを使って回答を送信します。送信された回答は非同期でスコアリングされます。\n\n**ヘッダー**: \`X-Api-Key: <APIキー>\`\n\n送信後、\`answerId\` を使って \`GET /results?answerId=xxx\` でスコアを取得できます。`,
+    description: `外部アプリからAPIキーを使って回答を送信します。送信された回答は非同期でスコアリングされます。\n\n**ヘッダー**: \`X-Api-Key: <APIキー>\`, \`X-Tenant-Id: <テナントID>\`\n\n質問取得・セッション単位の結果取得まで行う外部連携では、\`POST /sessions\` から始めるセッション型APIを使用してください。`,
   })
   submit(@CurrentTenant() tenantId: string, @Body() dto: SubmitAnswerBody) {
     return this.answersService.submit(tenantId, dto);

@@ -42,6 +42,7 @@ export default async function ModelTestPage({ params }: { params: { id: string }
 
   const questions = flattenQuestions(model.axes ?? []);
   const outputFormats = model.outputFormats ?? [];
+  const questionGroups = model.questionGroups ?? [];
 
   return (
     <div>
@@ -76,7 +77,12 @@ export default async function ModelTestPage({ params }: { params: { id: string }
           </Link>
         </div>
       ) : (
-        <TestClient modelId={model.id} questions={questions} outputFormats={outputFormats} />
+        <TestClient
+          modelId={model.id}
+          questions={questions}
+          outputFormats={outputFormats}
+          questionGroups={questionGroups}
+        />
       )}
     </div>
   );

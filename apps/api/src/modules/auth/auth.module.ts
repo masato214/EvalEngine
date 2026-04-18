@@ -9,9 +9,11 @@ import { ApiKeyStrategy } from './strategies/api-key.strategy';
 @Module({
   imports: [
     PassportModule,
-    JwtModule.register({
-      secret: process.env.JWT_SECRET ?? 'dev-secret',
-      signOptions: { expiresIn: process.env.JWT_EXPIRY ?? '15m' },
+    JwtModule.registerAsync({
+      useFactory: () => ({
+        secret: process.env.JWT_SECRET ?? 'dev-secret',
+        signOptions: { expiresIn: process.env.JWT_EXPIRY ?? '15m' },
+      }),
     }),
   ],
   controllers: [AuthController],

@@ -7,6 +7,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { SessionsService } from './sessions.service';
 import { ApiKeyGuard } from '../../common/guards/api-key.guard';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { JwtOrApiKeyAuthGuard } from '../../common/guards/jwt-or-api-key-auth.guard';
 import { CurrentTenant } from '../../common/decorators/current-tenant.decorator';
 
 class CreateSessionBody {
@@ -115,8 +116,9 @@ export class SessionsController {
 
   @Get(':id')
   @ApiSecurity('api-key')
-  @UseGuards(ApiKeyGuard)
-  @ApiOperation({ summary: 'セッション詳細取得', description: 'セッションの現在ステータスや関連情報を取得します。' })
+  @ApiBearerAuth('bearer')
+  @UseGuards(JwtOrApiKeyAuthGuard)
+  @ApiOperation({ summary: 'セッション詳細取得', description: 'セッションの現在ステータスや関連情報を取得します。管理画面JWTと外部APIキーの両方で取得できます。' })
   findOne(@Param('id') id: string, @CurrentTenant() tenantId: string) {
     return this.sessionsService.findOne(id, tenantId);
   }

@@ -18,6 +18,6 @@ import { ApiKeyStrategy } from './strategies/api-key.strategy';
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy, ApiKeyStrategy],
-  exports: [AuthService, JwtModule],
+  exports: [AuthService, JwtModule, JwtStrategy, ApiKeyStrategy],
 })
 export class AuthModule {}

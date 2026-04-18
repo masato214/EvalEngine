@@ -5,6 +5,10 @@ import { apiClient } from '@/lib/api-client';
 import type { ResultDto } from '@evalengine/types';
 import { Building2, FolderOpen, Brain } from 'lucide-react';
 
+function respondentNameFrom(result: any) {
+  return result?.respondentName ?? result?.answer?.respondentMeta?.name ?? result?.respondentRef;
+}
+
 export default async function ResultsPage() {
   const session = await getServerSession(authOptions);
   const token = (session as any)?.accessToken ?? '';
@@ -79,7 +83,7 @@ export default async function ResultsPage() {
                                 <tr key={r.id} className="border-t border-gray-50 hover:bg-gray-50">
                                   <td className="px-3 py-3">
                                     <Link href={`/results/${r.id}`} className="text-blue-600 hover:underline font-medium">
-                                      {r.respondentRef}
+                                      {respondentNameFrom(r)}
                                     </Link>
                                   </td>
                                   <td className="px-3 py-3">

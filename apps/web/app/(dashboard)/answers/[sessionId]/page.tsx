@@ -36,6 +36,13 @@ const sessionStatusLabels: Record<string, string> = {
   FAILED: 'エラー',
 };
 
+function respondentNameFrom(answer: any) {
+  return answer?.respondentMeta?.name
+    ?? answer?.respondentRef
+    ?? answer?.respondentId
+    ?? null;
+}
+
 export default async function SessionDetailPage({ params }: { params: { sessionId: string } }) {
   const session = await getServerSession(authOptions);
   const token = (session as any)?.accessToken ?? '';
@@ -133,7 +140,7 @@ export default async function SessionDetailPage({ params }: { params: { sessionI
                   <span className="text-sm text-gray-400 w-6 flex-shrink-0">{i + 1}</span>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900 truncate">
-                      {answer.respondentRef ?? answer.respondentId ?? `回答者 ${answer.id.slice(0, 8)}`}
+                      {respondentNameFrom(answer) ?? `回答者 ${answer.id.slice(0, 8)}`}
                     </p>
                     {answer.createdAt && (
                       <p className="text-xs text-gray-400 mt-0.5">

@@ -26,6 +26,10 @@ function formatValue(value: unknown) {
   return String(value);
 }
 
+function respondentNameFrom(answer: any) {
+  return answer?.respondentMeta?.name ?? answer?.respondentRef ?? null;
+}
+
 export default async function AnswerDetailPage({
   params,
 }: {
@@ -58,6 +62,7 @@ export default async function AnswerDetailPage({
 
   const statusLabel = answerStatusLabels[answer.status] ?? answer.status;
   const statusColor = answerStatusColors[answer.status] ?? 'bg-gray-100 text-gray-600';
+  const respondentName = respondentNameFrom(answer);
 
   return (
     <div>
@@ -70,7 +75,7 @@ export default async function AnswerDetailPage({
         <div className="flex items-start justify-between gap-4 mt-3">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
-              {answer.respondentRef ?? `回答 ${params.answerId.slice(0, 8)}`}
+              {respondentName ?? `回答 ${params.answerId.slice(0, 8)}`}
             </h1>
             <div className="flex items-center gap-4 mt-2 text-xs text-gray-400 flex-wrap">
               <span className="flex items-center gap-1">

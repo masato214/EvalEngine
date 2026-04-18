@@ -8,6 +8,13 @@ type PageProps = {
   searchParams?: { tenantId?: string };
 };
 
+function respondentNameFrom(value: any) {
+  return value?.respondentName
+    ?? value?.answer?.respondentMeta?.name
+    ?? value?.respondentRef
+    ?? null;
+}
+
 export default async function PortalHomePage({ searchParams }: PageProps) {
   const session = await getServerSession(authOptions);
   const token = (session as any)?.accessToken ?? '';
@@ -182,7 +189,7 @@ export default async function PortalHomePage({ searchParams }: PageProps) {
               {results.map((r: any) => (
                 <div key={r.id} className="flex items-center gap-3 px-5 py-3">
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">{r.respondentRef}</p>
+                    <p className="text-sm font-medium text-gray-900 truncate">{respondentNameFrom(r)}</p>
                     <p className="text-xs text-gray-400 mt-0.5">
                       {new Date(r.createdAt).toLocaleDateString('ja-JP')}
                     </p>

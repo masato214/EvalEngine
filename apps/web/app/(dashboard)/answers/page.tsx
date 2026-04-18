@@ -20,6 +20,14 @@ const sessionStatusLabels: Record<string, string> = {
   FAILED: 'エラー',
 };
 
+function respondentNameFrom(value: any) {
+  const latestAnswer = value?.answers?.[0];
+  return latestAnswer?.respondentMeta?.name
+    ?? latestAnswer?.respondentRef
+    ?? value?.userExternalId
+    ?? null;
+}
+
 export default async function AnswersPage() {
   const session = await getServerSession(authOptions);
   const token = (session as any)?.accessToken ?? '';
@@ -100,6 +108,7 @@ export default async function AnswersPage() {
                               const statusColor = sessionStatusColors[s.status] ?? 'bg-gray-100 text-gray-500';
                               const answerCount = s._count?.answers ?? 0;
                               const createdAt = s.createdAt ? new Date(s.createdAt).toLocaleDateString('ja-JP') : '';
+                              const respondentName = respondentNameFrom(s);
                               return (
                                 <Link
                                   key={s.id}
@@ -113,7 +122,7 @@ export default async function AnswersPage() {
                                     <ChevronRight size={14} className="text-gray-300 group-hover:text-blue-400 transition-colors mt-0.5" />
                                   </div>
                                   <p className="text-sm font-medium text-gray-900 mb-1 truncate">
-                                    {s.userExternalId ?? `セッション ${s.id.slice(0, 8)}`}
+                                    {respondentName ?? `セッション ${s.id.slice(0, 8)}`}
                                   </p>
                                   <div className="flex items-center gap-3 text-xs text-gray-400 mt-2">
                                     <span className="flex items-center gap-1">

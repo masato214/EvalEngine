@@ -288,9 +288,13 @@ export class SessionsService {
   }
 
   /** GET /sessions */
-  async findAll(tenantId: string | undefined, modelId?: string) {
+  async findAll(tenantId: string | undefined, modelId?: string, userExternalId?: string) {
     return this.prisma.session.findMany({
-      where: { ...(tenantId ? { tenantId } : {}), ...(modelId ? { modelId } : {}) },
+      where: {
+        ...(tenantId ? { tenantId } : {}),
+        ...(modelId ? { modelId } : {}),
+        ...(userExternalId ? { userExternalId } : {}),
+      },
       orderBy: { createdAt: 'desc' },
       include: {
         tenant: { select: { id: true, name: true, slug: true } },
@@ -303,6 +307,22 @@ export class SessionsService {
           },
         },
         questionGroup: { select: { id: true, name: true, groupType: true } },
+        answers: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: {
+            id: true,
+            respondentRef: true,
+            respondentMeta: true,
+            status: true,
+            createdAt: true,
+            results: {
+              where: { isLatest: true },
+              select: { id: true, overallScore: true },
+              take: 1,
+            },
+          },
+        },
         _count: { select: { answers: true, results: true } },
       },
     });
@@ -311,6 +331,42 @@ export class SessionsService {
   /** GET /sessions/:id */
   async findOne(sessionId: string, tenantId: string) {
     return this._getSession(sessionId, tenantId);
+  }
+
+  async findByRespondent(tenantId: string, respondentRef: string, modelId?: string) {
+    return this.findAll(tenantId, modelId, respondentRef);
+  }
+
+  async remove(sessionId: string, tenantId: string) {
+    const session = await this.prisma.session.findFirst({
+      where: { id: sessionId, tenantId },
+      select: { id: true },
+    });
+    if (!session) throw new NotFoundException('Session not found');
+
+    await this.prisma.$transaction(async (tx) => {
+      const answers = await tx.answer.findMany({
+        where: { sessionId, tenantId },
+        select: { id: true },
+      });
+      const answerIds = answers.map((answer) => answer.id);
+      const results = await tx.result.findMany({
+        where: { sessionId, tenantId },
+        select: { id: true },
+      });
+      const resultIds = results.map((result) => result.id);
+
+      if (resultIds.length > 0) {
+        await tx.resultScore.deleteMany({ where: { resultId: { in: resultIds } } });
+        await tx.result.deleteMany({ where: { id: { in: resultIds } } });
+      }
+      if (answerIds.length > 0) {
+        await tx.embedding.deleteMany({ where: { answerItem: { answerId: { in: answerIds } } } });
+        await tx.answerItem.deleteMany({ where: { answerId: { in: answerIds } } });
+        await tx.answer.deleteMany({ where: { id: { in: answerIds } } });
+      }
+      await tx.session.delete({ where: { id: sessionId } });
+    });
   }
 
   async findRespondentResults(
@@ -541,6 +597,7 @@ export class SessionsService {
           select: {
             id: true,
             respondentRef: true,
+            respondentMeta: true,
             status: true,
             createdAt: true,
             items: {

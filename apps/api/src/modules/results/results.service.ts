@@ -31,6 +31,7 @@ export class ResultsService {
               project: { select: { id: true, name: true, tenantId: true } },
             },
           },
+          answer: { select: { respondentMeta: true } },
           scores: { include: { axis: { select: { id: true, name: true } } } },
         },
       }),
@@ -59,7 +60,10 @@ export class ResultsService {
     const results = await this.prisma.result.findMany({
       where: { respondentRef, ...(tenantId ? { tenantId } : {}), isLatest: true },
       orderBy: { createdAt: 'desc' },
-      include: { scores: { include: { axis: { select: { id: true, name: true } } } } },
+      include: {
+        answer: { select: { respondentMeta: true } },
+        scores: { include: { axis: { select: { id: true, name: true } } } },
+      },
     });
     return results.map((r) => this._format(r));
   }
@@ -73,6 +77,7 @@ export class ResultsService {
       modelId: result.modelId,
       modelVersion: result.modelVersion ?? 1,
       respondentRef: result.respondentRef,
+      respondentName: result.answer?.respondentMeta?.name ?? null,
       overallScore: result.overallScore,
       isLatest: result.isLatest,
       resultType: result.resultType ?? null,

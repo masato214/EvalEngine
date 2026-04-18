@@ -1,5 +1,5 @@
 import {
-  Controller, Get, Post, Body, Param, Query, UseGuards, HttpCode,
+  Controller, Get, Post, Body, Param, Query, UseGuards, HttpCode, Delete,
 } from '@nestjs/common';
 import { ApiTags, ApiSecurity, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { IsString, IsOptional, IsArray, IsObject } from 'class-validator';
@@ -26,7 +26,10 @@ class AnswerItemDto {
 }
 
 class SubmitAnswersBody {
-  @ApiPropertyOptional() @IsOptional() @IsObject() respondentMeta?: Record<string, unknown>;
+  @ApiPropertyOptional({
+    description: '回答者の属性情報。表示名を出す場合は name を入れてください。例: { "name": "山田 太郎", "grade": "2年", "school": "..." }',
+  })
+  @IsOptional() @IsObject() respondentMeta?: Record<string, unknown>;
   @ApiProperty({ type: [AnswerItemDto] }) @IsArray() items!: AnswerItemDto[];
 }
 
@@ -54,8 +57,21 @@ export class SessionsController {
   findAll(
     @CurrentTenant() tenantId: string,
     @Query('modelId') modelId?: string,
+    @Query('userExternalId') userExternalId?: string,
   ) {
-    return this.sessionsService.findAll(tenantId, modelId);
+    return this.sessionsService.findAll(tenantId, modelId, userExternalId);
+  }
+
+  @Get('respondents/:ref/sessions')
+  @ApiSecurity('api-key')
+  @UseGuards(ApiKeyGuard)
+  @ApiOperation({ summary: '回答者別のセッション一覧取得', description: '外部アプリからAPIキーで、userExternalIdに紐づくセッション一覧を取得します。回答済みチェックに使用できます。' })
+  findRespondentSessions(
+    @Param('ref') ref: string,
+    @CurrentTenant() tenantId: string,
+    @Query('modelId') modelId?: string,
+  ) {
+    return this.sessionsService.findByRespondent(tenantId, ref, modelId);
   }
 
   @Get('respondents/:ref/results')
@@ -155,5 +171,14 @@ export class SessionsController {
   @ApiOperation({ summary: '全スコア履歴取得', description: '再計算を含む全スコア結果の履歴を取得します。`isLatest: true` のものが最新結果です。' })
   getResults(@Param('id') id: string, @CurrentTenant() tenantId: string) {
     return this.sessionsService.getResults(id, tenantId);
+  }
+
+  @Delete(':id')
+  @HttpCode(204)
+  @ApiSecurity('api-key')
+  @UseGuards(ApiKeyGuard)
+  @ApiOperation({ summary: 'セッション削除', description: '外部アプリからAPIキーでセッションを削除します。紐づく回答・結果もEvalEngine内から削除されます。外部DBの回答済み記録は自動では消えません。' })
+  remove(@Param('id') id: string, @CurrentTenant() tenantId: string) {
+    return this.sessionsService.remove(id, tenantId);
   }
 }

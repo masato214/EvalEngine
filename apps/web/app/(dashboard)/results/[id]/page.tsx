@@ -13,6 +13,10 @@ const TENDENCY_LABELS: Record<string, string> = {
   very_low: '非常に低い',
 };
 
+function respondentNameFrom(result: any) {
+  return result?.respondentName ?? result?.answer?.respondentMeta?.name ?? result?.respondentRef;
+}
+
 function RubricBadge({ level }: { level: number | null }) {
   if (level == null) return null;
   const rounded = Math.round(level * 10) / 10;
@@ -51,7 +55,7 @@ export default async function ResultDetailPage({ params }: { params: { id: strin
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">{result.respondentRef}</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{respondentNameFrom(result)}</h1>
         <div className="flex items-center gap-3 mt-2 flex-wrap">
           <span className="text-gray-600 font-medium">
             総合スコア: {Math.round(result.overallScore * 100)}%

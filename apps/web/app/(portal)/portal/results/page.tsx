@@ -8,6 +8,16 @@ type PageProps = {
   searchParams?: { tenantId?: string };
 };
 
+function respondentNameFrom(value: any) {
+  const latestAnswer = value?.answers?.[0];
+  return value?.respondentName
+    ?? value?.answer?.respondentMeta?.name
+    ?? latestAnswer?.respondentMeta?.name
+    ?? value?.respondentRef
+    ?? value?.userExternalId
+    ?? null;
+}
+
 export default async function PortalResultsPage({ searchParams }: PageProps) {
   const session = await getServerSession(authOptions);
   const token = (session as any)?.accessToken ?? '';
@@ -123,7 +133,7 @@ export default async function PortalResultsPage({ searchParams }: PageProps) {
                       {s.model?.name ?? 'モデル不明'}
                     </p>
                     <p className="text-xs text-gray-400 mt-0.5">
-                      {s.userExternalId} · {new Date(s.createdAt).toLocaleDateString('ja-JP')}
+                      {respondentNameFrom(s) ?? s.userExternalId} · {new Date(s.createdAt).toLocaleDateString('ja-JP')}
                     </p>
                   </div>
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${sessionStatusColors[s.status] ?? 'bg-gray-100 text-gray-500'}`}>
@@ -154,7 +164,7 @@ export default async function PortalResultsPage({ searchParams }: PageProps) {
                 return (
                   <div key={r.id} className="flex items-center gap-4 px-5 py-3">
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">{r.respondentRef}</p>
+                      <p className="text-sm font-medium text-gray-900 truncate">{respondentNameFrom(r)}</p>
                       <p className="text-xs text-gray-400 mt-0.5">
                         {new Date(r.createdAt).toLocaleDateString('ja-JP')}
                       </p>

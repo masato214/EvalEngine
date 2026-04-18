@@ -123,7 +123,7 @@ export default async function SessionDetailPage({ params }: { params: { sessionI
             {answers.map((answer: any, i: number) => {
               const aStatusLabel = answerStatusLabels[answer.status] ?? answer.status;
               const aStatusColor = answerStatusColors[answer.status] ?? 'bg-gray-100 text-gray-500';
-              const hasResult = answer.result ?? answer.analysisResult;
+              const hasResult = answer.result ?? answer.analysisResult ?? answer.results?.length;
 
               return (
                 <div

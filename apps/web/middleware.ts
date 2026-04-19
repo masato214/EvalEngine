@@ -10,6 +10,19 @@ export default withAuth(
       loginUrl.searchParams.set('error', 'SessionExpired');
       return NextResponse.redirect(loginUrl);
     }
+    const role = token?.role;
+    const pathname = req.nextUrl.pathname;
+    const clientAllowed = [
+      '/portal',
+      '/evaluation-models',
+      '/api-keys',
+      '/answers',
+      '/results',
+      '/respond',
+    ];
+    if (role && role !== 'SUPER_ADMIN' && !clientAllowed.some((path) => pathname === path || pathname.startsWith(`${path}/`))) {
+      return NextResponse.redirect(new URL('/portal', req.url));
+    }
     return NextResponse.next();
   },
   {

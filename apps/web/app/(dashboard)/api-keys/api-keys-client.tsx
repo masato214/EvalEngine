@@ -158,7 +158,7 @@ function NewKeyModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
   );
 }
 
-function KeyRevealModal({ apiKey, onClose }: { apiKey: { name: string; key: string }; onClose: () => void }) {
+function KeyRevealModal({ apiKey, tenantId, onClose }: { apiKey: { name: string; key: string }; tenantId: string; onClose: () => void }) {
   const [copied, setCopied] = useState(false);
   function handleCopy() {
     navigator.clipboard.writeText(apiKey.key);
@@ -200,9 +200,10 @@ function KeyRevealModal({ apiKey, onClose }: { apiKey: { name: string; key: stri
           <div className="bg-gray-50 rounded-xl p-4">
             <p className="text-xs font-medium text-gray-700 mb-2">使い方</p>
             <p className="text-xs text-gray-500 mb-2">APIリクエストのヘッダーに以下を含めてください：</p>
-            <code className="text-xs bg-gray-900 text-green-400 rounded px-3 py-2 block font-mono">
-              X-API-Key: {apiKey.key}
-            </code>
+            <pre className="text-xs bg-gray-900 text-green-400 rounded px-3 py-2 block font-mono whitespace-pre-wrap break-words">
+{`x-tenant-id: ${tenantId}
+x-api-key: ${apiKey.key}`}
+            </pre>
           </div>
 
           <button
@@ -217,7 +218,7 @@ function KeyRevealModal({ apiKey, onClose }: { apiKey: { name: string; key: stri
   );
 }
 
-export function ApiKeysClient({ initialKeys }: { initialKeys: ApiKey[] }) {
+export function ApiKeysClient({ initialKeys, tenantId }: { initialKeys: ApiKey[]; tenantId: string }) {
   const [keys, setKeys] = useState<ApiKey[]>(initialKeys);
   const [showNewModal, setShowNewModal] = useState(false);
   const [revealKey, setRevealKey] = useState<{ name: string; key: string } | null>(null);
@@ -400,13 +401,14 @@ export function ApiKeysClient({ initialKeys }: { initialKeys: ApiKey[] }) {
               すべてのAPIリクエストにAPIキーをヘッダーで送信してください。
             </p>
             <div className="bg-gray-900 rounded-xl px-5 py-3 flex items-center gap-3">
-              <code className="text-green-400 text-sm font-mono flex-1">
-                X-API-Key: ek_your_api_key_here
+              <code className="text-green-400 text-sm font-mono flex-1 whitespace-pre-wrap">
+{`x-tenant-id: ${tenantId || 'tenant-moonjapan'}
+x-api-key: ek_your_api_key_here`}
               </code>
-              <CopyButton text="X-API-Key: ek_your_api_key_here" />
+              <CopyButton text={`x-tenant-id: ${tenantId || 'tenant-moonjapan'}\nx-api-key: ek_your_api_key_here`} />
             </div>
             <p className="text-xs text-gray-500 mt-3">
-              ベースURL: <code className="bg-gray-100 px-1.5 py-0.5 rounded">http://localhost:3001/api/v1</code>
+              ベースURL: <code className="bg-gray-100 px-1.5 py-0.5 rounded">https://evalengine-api-2aq8.onrender.com/api/v1</code>
             </p>
           </div>
 
@@ -426,7 +428,7 @@ export function ApiKeysClient({ initialKeys }: { initialKeys: ApiKey[] }) {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <code className="text-sm font-mono text-gray-900">{ep.path}</code>
-                          <CopyButton text={`http://localhost:3001/api/v1${ep.path}`} />
+                          <CopyButton text={`https://evalengine-api-2aq8.onrender.com/api/v1${ep.path}`} />
                         </div>
                         <p className="text-sm text-gray-600 mt-1">{ep.desc}</p>
                         {ep.note && (
@@ -457,7 +459,7 @@ export function ApiKeysClient({ initialKeys }: { initialKeys: ApiKey[] }) {
               </p>
             </div>
             <a
-              href="http://localhost:3001/api/docs"
+              href="https://evalengine-api-2aq8.onrender.com/api/docs"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors flex-shrink-0 ml-4"
@@ -475,7 +477,7 @@ export function ApiKeysClient({ initialKeys }: { initialKeys: ApiKey[] }) {
       )}
 
       {revealKey && (
-        <KeyRevealModal apiKey={revealKey} onClose={() => setRevealKey(null)} />
+        <KeyRevealModal apiKey={revealKey} tenantId={tenantId || 'tenant-moonjapan'} onClose={() => setRevealKey(null)} />
       )}
     </div>
   );

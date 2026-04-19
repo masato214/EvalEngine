@@ -24,6 +24,7 @@ export async function createApiKey(name: string) {
   }
   const json = await res.json();
   revalidatePath('/api-keys');
+  revalidatePath('/portal/settings');
   return json.data ?? json;
 }
 
@@ -39,6 +40,7 @@ export async function revokeApiKey(id: string) {
   }
   const json = await res.json();
   revalidatePath('/api-keys');
+  revalidatePath('/portal/settings');
   return json.data ?? json;
 }
 
@@ -53,4 +55,5 @@ export async function deleteApiKey(id: string) {
     throw new Error(err.message ?? 'APIキーの削除に失敗しました');
   }
   revalidatePath('/api-keys');
+  revalidatePath('/portal/settings');
 }

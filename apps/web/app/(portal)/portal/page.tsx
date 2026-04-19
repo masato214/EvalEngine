@@ -141,7 +141,7 @@ export default async function PortalHomePage({ searchParams }: PageProps) {
               {models.slice(0, 5).map((m) => (
                 <Link
                   key={m.id}
-                  href={role === 'SUPER_ADMIN' ? `/evaluation-models/${m.id}` : `/portal/models${scopeQuery}`}
+                  href={role === 'VIEWER' ? `/portal/models${scopeQuery}` : `/evaluation-models/${m.id}`}
                   className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors group"
                 >
                   <div className="flex-1 min-w-0">
@@ -155,7 +155,7 @@ export default async function PortalHomePage({ searchParams }: PageProps) {
             </div>
           )}
           <div className="px-5 py-3 border-t border-gray-50">
-            {role === 'SUPER_ADMIN' ? (
+            {role !== 'VIEWER' ? (
               <Link
                 href="/evaluation-models/new"
                 className="text-xs text-indigo-600 hover:underline"

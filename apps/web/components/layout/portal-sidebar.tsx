@@ -8,7 +8,6 @@ import {
   Brain,
   BarChart3,
   Settings,
-  Users,
   KeyRound,
   ChevronRight,
 } from 'lucide-react';
@@ -17,6 +16,7 @@ const navItems = [
   { label: 'ホーム', href: '/portal', icon: LayoutDashboard, exact: true },
   { label: '評価モデル', href: '/portal/models', icon: Brain },
   { label: '結果・分析', href: '/portal/results', icon: BarChart3 },
+  { label: 'API管理', href: '/api-keys', icon: KeyRound },
   { label: '設定', href: '/portal/settings', icon: Settings },
 ];
 

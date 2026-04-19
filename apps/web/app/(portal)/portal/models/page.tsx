@@ -19,6 +19,7 @@ export default async function PortalModelsPage({ searchParams }: PageProps) {
   const session = await getServerSession(authOptions);
   const token = (session as any)?.accessToken ?? '';
   const role = (session as any)?.role ?? '';
+  const canManageModels = role !== 'VIEWER';
   const selectedTenantId = role === 'SUPER_ADMIN' ? searchParams?.tenantId : undefined;
   const tenantScope = selectedTenantId ? { tenantId: selectedTenantId } : undefined;
 
@@ -44,13 +45,15 @@ export default async function PortalModelsPage({ searchParams }: PageProps) {
             {selectedTenantId ? '選択中のクライアントの評価軸・質問・出力形式を管理します' : '評価軸・質問・出力形式を管理します'}
           </p>
         </div>
-        <Link
-          href="/evaluation-models/new"
-          className={`flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 ${role === 'SUPER_ADMIN' ? '' : 'hidden'}`}
-        >
-          <Plus size={15} />
-          新規作成
-        </Link>
+        {canManageModels && (
+          <Link
+            href="/evaluation-models/new"
+            className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700"
+          >
+            <Plus size={15} />
+            新規作成
+          </Link>
+        )}
       </div>
 
       {role === 'SUPER_ADMIN' && (
@@ -85,7 +88,7 @@ export default async function PortalModelsPage({ searchParams }: PageProps) {
         <div className="bg-white rounded-xl border border-dashed border-gray-200 p-12 text-center">
           <Brain size={32} className="text-gray-300 mx-auto mb-3" />
           <p className="text-gray-400 text-sm">評価モデルがありません</p>
-          {role === 'SUPER_ADMIN' && (
+          {canManageModels && (
             <Link href="/evaluation-models/new" className="text-indigo-600 text-sm hover:underline mt-2 inline-block">
               最初の評価モデルを作成 →
             </Link>
@@ -114,7 +117,7 @@ export default async function PortalModelsPage({ searchParams }: PageProps) {
                       <span>{new Date(m.createdAt).toLocaleDateString('ja-JP')}</span>
                     </div>
                   </div>
-                  {role === 'SUPER_ADMIN' && (
+                  {canManageModels && (
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <Link
                         href={`/evaluation-models/${m.id}/test`}

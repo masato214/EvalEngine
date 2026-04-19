@@ -6,6 +6,7 @@ import { ApiKeysClient } from './api-keys-client';
 export default async function ApiKeysPage() {
   const session = await getServerSession(authOptions);
   const token = (session as any)?.accessToken ?? '';
+  const tenantId = (session as any)?.tenantId ?? '';
 
   let apiKeys: any[] = [];
   try {
@@ -14,5 +15,5 @@ export default async function ApiKeysPage() {
     if (!Array.isArray(apiKeys)) apiKeys = [];
   } catch {}
 
-  return <ApiKeysClient initialKeys={apiKeys} />;
+  return <ApiKeysClient initialKeys={apiKeys} tenantId={tenantId} />;
 }

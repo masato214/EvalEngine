@@ -2,7 +2,7 @@ import {
   Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards,
 } from '@nestjs/common';
 import {
-  ApiBearerAuth, ApiOperation, ApiProperty, ApiPropertyOptional, ApiQuery, ApiTags,
+  ApiBearerAuth, ApiOperation, ApiProperty, ApiPropertyOptional, ApiQuery, ApiSecurity, ApiTags,
 } from '@nestjs/swagger';
 import {
   IsArray, IsBoolean, IsEnum, IsNumber, IsObject, IsOptional, IsString, Min,
@@ -10,6 +10,7 @@ import {
 import { QuestionGroupType } from '@prisma/client';
 import { QuestionGroupsService } from './question-groups.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { JwtOrApiKeyAuthGuard } from '../../common/guards/jwt-or-api-key-auth.guard';
 import { CurrentTenant } from '../../common/decorators/current-tenant.decorator';
 
 class CreateQuestionGroupBody {
@@ -38,7 +39,8 @@ class ReplaceItemsBody {
 
 @ApiTags('question-groups')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@ApiSecurity('api-key')
+@UseGuards(JwtOrApiKeyAuthGuard)
 @Controller('question-groups')
 export class TenantQuestionGroupsController {
   constructor(private service: QuestionGroupsService) {}

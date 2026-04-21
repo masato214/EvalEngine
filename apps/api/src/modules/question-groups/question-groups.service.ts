@@ -22,9 +22,55 @@ export interface UpsertQuestionGroupItemDto {
   metadata?: Record<string, unknown>;
 }
 
+export interface FindTenantQuestionGroupsOptions {
+  modelId?: string;
+  includeInactive?: boolean;
+}
+
 @Injectable()
 export class QuestionGroupsService {
   constructor(private prisma: PrismaService) {}
+
+  async findTenantGroups(tenantId: string | undefined, options: FindTenantQuestionGroupsOptions = {}) {
+    return this.prisma.questionGroup.findMany({
+      where: {
+        ...(options.includeInactive ? {} : { isActive: true }),
+        ...(options.modelId ? { modelId: options.modelId } : {}),
+        model: tenantId ? { tenantId } : undefined,
+      },
+      orderBy: [
+        { model: { name: 'asc' } },
+        { order: 'asc' },
+        { createdAt: 'asc' },
+      ],
+      select: {
+        id: true,
+        modelId: true,
+        name: true,
+        description: true,
+        groupType: true,
+        config: true,
+        isActive: true,
+        order: true,
+        createdAt: true,
+        updatedAt: true,
+        model: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            status: true,
+          },
+        },
+        _count: {
+          select: {
+            items: true,
+            sessions: true,
+          },
+        },
+      },
+    });
+  }
 
   async findAll(modelId: string, tenantId: string | undefined) {
     await this.ensureModel(modelId, tenantId);

@@ -1,7 +1,9 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, ParseIntPipe } from '@nestjs/common';
+import {
+  Controller, Get, Post, Put, Delete, Body, Param, UseGuards, ParseIntPipe,
+} from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import {
-  IsString, IsEnum, IsOptional, IsNumber, IsBoolean, Min,
+  IsArray, IsString, IsEnum, IsOptional, IsNumber, IsBoolean, Min,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { QuestionType } from '@prisma/client';
@@ -38,6 +40,10 @@ class UpsertCriteriaBody {
   @ApiProperty() @IsString() description!: string;
 }
 
+class ReorderQuestionsBody {
+  @ApiProperty({ type: [String] }) @IsArray() @IsString({ each: true }) questionIds!: string[];
+}
+
 @ApiTags('questions')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
@@ -48,6 +54,11 @@ export class QuestionsController {
   @Get()
   findAll(@Param('modelId') modelId: string) {
     return this.questionsService.findAll(modelId);
+  }
+
+  @Put('order')
+  reorder(@Param('modelId') modelId: string, @Body() dto: ReorderQuestionsBody) {
+    return this.questionsService.reorder(modelId, dto);
   }
 
   @Get(':id')

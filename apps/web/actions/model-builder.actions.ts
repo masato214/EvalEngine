@@ -392,6 +392,22 @@ export async function deleteQuestionOption(modelId: string, questionId: string, 
   revalidatePath(`/evaluation-models/${modelId}`);
 }
 
+export async function reorderQuestions(modelId: string, questionIds: string[]) {
+  const token = await getToken();
+  const res = await fetch(`${API}/evaluation-models/${modelId}/questions/order`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ questionIds }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(err.message ?? '質問順の保存に失敗しました');
+  }
+  const json = await res.json();
+  revalidatePath(`/evaluation-models/${modelId}`);
+  return json.data ?? json;
+}
+
 export async function createQuestionGroup(
   modelId: string,
   data: {

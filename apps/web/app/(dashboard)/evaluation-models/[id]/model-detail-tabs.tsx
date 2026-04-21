@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { Pencil, Check, X, Copy, Trash2, Plus, Save } from 'lucide-react';
+import {
+  Pencil, Check, X, Copy, Trash2, Plus, Save, ArrowUp, ArrowDown,
+} from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { AxisTree } from './axis-tree';
 import { AxisForm } from './axis-form';
@@ -13,6 +15,7 @@ import {
   updateQuestionGroup,
   deleteQuestionGroup,
   replaceQuestionGroupItems,
+  reorderQuestions,
 } from '@/actions/model-builder.actions';
 
 interface Props {
@@ -329,8 +332,8 @@ function QuestionGroupsTab({
     CUSTOM: 'カスタム',
   };
   const [selectedGroupId, setSelectedGroupId] = useState(questionGroups[0]?.id ?? '');
-  const [selectedQuestionIds, setSelectedQuestionIds] = useState<Set<string>>(
-    () => new Set(questionGroups[0]?.items?.map((item: any) => item.questionId) ?? []),
+  const [orderedQuestionIds, setOrderedQuestionIds] = useState<string[]>(
+    () => questionGroups[0]?.items?.map((item: any) => item.questionId) ?? [],
   );
   const [newName, setNewName] = useState('');
   const [newType, setNewType] = useState('CUSTOM');
@@ -340,19 +343,32 @@ function QuestionGroupsTab({
   const [isPending, startTransition] = useTransition();
 
   const selectedGroup = questionGroups.find((group) => group.id === selectedGroupId) ?? questionGroups[0] ?? null;
+  const selectedQuestionIds = new Set(orderedQuestionIds);
+  const selectedQuestions = orderedQuestionIds
+    .map((questionId) => questions.find((question) => question.id === questionId))
+    .filter(Boolean);
 
   function chooseGroup(group: any) {
     setSelectedGroupId(group.id);
-    setSelectedQuestionIds(new Set(group.items?.map((item: any) => item.questionId) ?? []));
+    setOrderedQuestionIds(group.items?.map((item: any) => item.questionId) ?? []);
     setEditingGroup(null);
     setError('');
   }
 
   function toggleQuestion(questionId: string) {
-    setSelectedQuestionIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(questionId)) next.delete(questionId);
-      else next.add(questionId);
+    setOrderedQuestionIds((prev) => {
+      if (prev.includes(questionId)) return prev.filter((id) => id !== questionId);
+      return [...prev, questionId];
+    });
+  }
+
+  function moveSelectedQuestion(questionId: string, direction: -1 | 1) {
+    setOrderedQuestionIds((prev) => {
+      const index = prev.indexOf(questionId);
+      const nextIndex = index + direction;
+      if (index < 0 || nextIndex < 0 || nextIndex >= prev.length) return prev;
+      const next = [...prev];
+      [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
       return next;
     });
   }
@@ -372,7 +388,7 @@ function QuestionGroupsTab({
         setNewName('');
         setNewDescription('');
         setSelectedGroupId(created.id);
-        setSelectedQuestionIds(new Set());
+        setOrderedQuestionIds([]);
         router.refresh();
       } catch (e: any) {
         setError(e.message);
@@ -408,7 +424,7 @@ function QuestionGroupsTab({
         if (selectedGroupId === group.id) {
           const next = questionGroups.find((g) => g.id !== group.id);
           setSelectedGroupId(next?.id ?? '');
-          setSelectedQuestionIds(new Set(next?.items?.map((item: any) => item.questionId) ?? []));
+          setOrderedQuestionIds(next?.items?.map((item: any) => item.questionId) ?? []);
         }
         router.refresh();
       } catch (e: any) {
@@ -419,7 +435,7 @@ function QuestionGroupsTab({
 
   function handleSaveItems() {
     if (!selectedGroup) return;
-    const items = Array.from(selectedQuestionIds).map((questionId, index) => ({
+    const items = orderedQuestionIds.map((questionId, index) => ({
       questionId,
       order: index,
       required: true,
@@ -428,6 +444,22 @@ function QuestionGroupsTab({
     startTransition(async () => {
       try {
         await replaceQuestionGroupItems(modelId, selectedGroup.id, items);
+        router.refresh();
+      } catch (e: any) {
+        setError(e.message);
+      }
+    });
+  }
+
+  function handleSaveGlobalQuestionOrder() {
+    const orderedIds = [
+      ...orderedQuestionIds,
+      ...questions.map((question) => question.id).filter((id) => !selectedQuestionIds.has(id)),
+    ];
+    setError('');
+    startTransition(async () => {
+      try {
+        await reorderQuestions(modelId, orderedIds);
         router.refresh();
       } catch (e: any) {
         setError(e.message);
@@ -637,16 +669,64 @@ function QuestionGroupsTab({
                   </button>
                 </div>
                 <div className="flex items-center justify-between mb-3 text-xs text-gray-500">
-                  <span>{selectedQuestionIds.size} / {questions.length} 問を選択中</span>
+                  <span>{orderedQuestionIds.length} / {questions.length} 問を選択中</span>
                   <div className="flex gap-2">
-                    <button type="button" onClick={() => setSelectedQuestionIds(new Set(questions.map((q) => q.id)))} className="text-blue-600 hover:underline">
+                    <button type="button" onClick={() => setOrderedQuestionIds(questions.map((q) => q.id))} className="text-blue-600 hover:underline">
                       全選択
                     </button>
-                    <button type="button" onClick={() => setSelectedQuestionIds(new Set())} className="text-gray-500 hover:underline">
+                    <button type="button" onClick={() => setOrderedQuestionIds([])} className="text-gray-500 hover:underline">
                       全解除
                     </button>
                   </div>
                 </div>
+                {selectedQuestions.length > 0 && (
+                  <div className="mb-4 rounded-lg border border-blue-100 bg-blue-50 p-3">
+                    <div className="flex items-center justify-between gap-3 mb-2">
+                      <p className="text-xs font-semibold text-blue-900">配信順</p>
+                      <button
+                        type="button"
+                        onClick={handleSaveGlobalQuestionOrder}
+                        disabled={isPending}
+                        className="text-xs text-blue-700 hover:underline disabled:opacity-50"
+                      >
+                        この順番をモデル全体の質問順にも反映
+                      </button>
+                    </div>
+                    <div className="space-y-2">
+                      {selectedQuestions.map((question: any, index: number) => (
+                        <div key={question.id} className="flex items-start gap-2 rounded-md bg-white border border-blue-100 p-2">
+                          <div className="w-7 text-center text-xs font-semibold text-blue-700 pt-1">
+                            {index + 1}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[11px] text-gray-400 mb-0.5">{question.axisBreadcrumb.join(' › ')}</p>
+                            <p className="text-xs text-gray-800 leading-relaxed">{question.text}</p>
+                          </div>
+                          <div className="flex gap-1">
+                            <button
+                              type="button"
+                              onClick={() => moveSelectedQuestion(question.id, -1)}
+                              disabled={index === 0 || isPending}
+                              className="p-1 rounded border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40"
+                              title="上へ"
+                            >
+                              <ArrowUp size={12} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => moveSelectedQuestion(question.id, 1)}
+                              disabled={index === selectedQuestions.length - 1 || isPending}
+                              className="p-1 rounded border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40"
+                              title="下へ"
+                            >
+                              <ArrowDown size={12} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div className="max-h-[560px] overflow-y-auto space-y-2 pr-1">
                   {questions.map((question) => {
                     const checked = selectedQuestionIds.has(question.id);

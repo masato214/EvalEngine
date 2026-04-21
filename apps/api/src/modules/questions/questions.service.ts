@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { QuestionType } from '@prisma/client';
@@ -32,6 +32,10 @@ export interface UpsertCriteriaDto {
   level: number;
   label: string;
   description: string;
+}
+
+export interface ReorderQuestionsDto {
+  questionIds: string[];
 }
 
 @Injectable()
@@ -78,6 +82,39 @@ export class QuestionsService {
     });
     if (!q) throw new NotFoundException('Question not found');
     return q;
+  }
+
+  async reorder(modelId: string, dto: ReorderQuestionsDto) {
+    const questionIds = [...new Set(dto.questionIds)];
+    if (questionIds.length !== dto.questionIds.length) {
+      throw new BadRequestException('質問IDが重複しています');
+    }
+
+    const existingQuestions = await this.prisma.question.findMany({
+      where: { modelId },
+      select: { id: true },
+    });
+    const existingIds = new Set(existingQuestions.map((question) => question.id));
+    const missingIds = questionIds.filter((id) => !existingIds.has(id));
+    if (missingIds.length > 0) {
+      throw new BadRequestException('同じ評価モデルに属する質問だけを並び替えできます');
+    }
+
+    const orderedIds = [
+      ...questionIds,
+      ...existingQuestions
+        .map((question) => question.id)
+        .filter((id) => !questionIds.includes(id)),
+    ];
+
+    await this.prisma.$transaction(
+      orderedIds.map((id, order) => this.prisma.question.update({
+        where: { id },
+        data: { order },
+      })),
+    );
+
+    return this.findAll(modelId);
   }
 
   async create(modelId: string, dto: CreateQuestionDto) {

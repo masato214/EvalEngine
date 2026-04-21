@@ -1,7 +1,9 @@
 import {
-  Body, Controller, Delete, Get, Param, Post, Put, UseGuards,
+  Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth, ApiOperation, ApiProperty, ApiPropertyOptional, ApiQuery, ApiTags,
+} from '@nestjs/swagger';
 import {
   IsArray, IsBoolean, IsEnum, IsNumber, IsObject, IsOptional, IsString, Min,
 } from 'class-validator';
@@ -32,6 +34,29 @@ class QuestionGroupItemBody {
 
 class ReplaceItemsBody {
   @ApiProperty({ type: [QuestionGroupItemBody] }) @IsArray() items!: QuestionGroupItemBody[];
+}
+
+@ApiTags('question-groups')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
+@Controller('question-groups')
+export class TenantQuestionGroupsController {
+  constructor(private service: QuestionGroupsService) {}
+
+  @Get()
+  @ApiOperation({ summary: 'ログイン中テナントの質問グループ一覧を取得' })
+  @ApiQuery({ name: 'modelId', required: false, description: '評価モデルIDで絞り込み' })
+  @ApiQuery({ name: 'includeInactive', required: false, description: 'true の場合、無効な質問グループも含める' })
+  findTenantGroups(
+    @CurrentTenant() tenantId: string | undefined,
+    @Query('modelId') modelId?: string,
+    @Query('includeInactive') includeInactive?: string,
+  ) {
+    return this.service.findTenantGroups(tenantId, {
+      modelId,
+      includeInactive: includeInactive === 'true',
+    });
+  }
 }
 
 @ApiTags('question-groups')

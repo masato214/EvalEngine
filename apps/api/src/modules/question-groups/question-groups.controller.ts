@@ -47,6 +47,9 @@ export class TenantQuestionGroupsController {
 
   @Get()
   @ApiOperation({ summary: 'ログイン中テナントの質問グループ一覧を取得' })
+  @ApiBearerAuth('bearer')
+  @ApiSecurity('api-key')
+  @ApiSecurity('tenant-id')
   @ApiQuery({ name: 'modelId', required: false, description: '評価モデルIDで絞り込み' })
   @ApiQuery({ name: 'includeInactive', required: false, description: 'true の場合、無効な質問グループも含める' })
   findTenantGroups(

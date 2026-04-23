@@ -18,6 +18,7 @@ export default async function ModelDetailPage({ params }: { params: { id: string
   const token = (session as any)?.accessToken ?? '';
 
   let model: any = null;
+  let responseExportOptions: any = { dates: [], questionGroups: [], baseColumns: [] };
 
   try {
     const res = await apiClient.get(`/evaluation-models/${params.id}`, token);
@@ -25,6 +26,11 @@ export default async function ModelDetailPage({ params }: { params: { id: string
   } catch {
     notFound();
   }
+
+  try {
+    const res = await apiClient.get(`/evaluation-models/${params.id}/responses/export-options`, token);
+    responseExportOptions = res.data ?? res ?? responseExportOptions;
+  } catch {}
 
   if (!model) notFound();
 
@@ -75,6 +81,7 @@ export default async function ModelDetailPage({ params }: { params: { id: string
         outputFormats={outputFormats}
         questionGroups={questionGroups}
         model={model}
+        responseExportOptions={responseExportOptions}
       />
     </div>
   );

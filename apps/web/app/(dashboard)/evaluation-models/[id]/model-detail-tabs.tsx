@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import {
   Pencil, Check, X, Copy, Trash2, Plus, Save, ArrowUp, ArrowDown,
+  Download,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { AxisTree } from './axis-tree';
@@ -16,6 +17,7 @@ import {
   deleteQuestionGroup,
   replaceQuestionGroupItems,
   reorderQuestions,
+  exportModelResponsesCsv,
 } from '@/actions/model-builder.actions';
 
 interface Props {
@@ -24,6 +26,7 @@ interface Props {
   outputFormats: any[];
   questionGroups: any[];
   model: any;
+  responseExportOptions: any;
 }
 
 const STATUS_OPTIONS = [
@@ -36,11 +39,277 @@ const STATUS_OPTIONS = [
 const TABS = [
   { key: 'axes', label: '評価軸' },
   { key: 'question-groups', label: '質問グループ' },
+  { key: 'csv-export', label: 'CSV出力' },
   { key: 'output-formats', label: '出力形式' },
   { key: 'settings', label: '設定' },
 ] as const;
 
 type TabKey = (typeof TABS)[number]['key'];
+
+const DEFAULT_EXPORT_COLUMNS = ['answeredAt', 'sessionDate', 'questionGroup', 'respondentId', 'respondentName'];
+
+function ResponseExportTab({
+  modelId,
+  questionGroups,
+  questions,
+  responseExportOptions,
+}: {
+  modelId: string;
+  questionGroups: any[];
+  questions: any[];
+  responseExportOptions: any;
+}) {
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState('');
+  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
+  const [selectedDates, setSelectedDates] = useState<string[]>([]);
+  const [selectedColumnKeys, setSelectedColumnKeys] = useState<string[]>(DEFAULT_EXPORT_COLUMNS);
+  const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>(questions.map((question) => question.id));
+  const [useDisplayText, setUseDisplayText] = useState(true);
+
+  const availableDateOptions = responseExportOptions?.dates ?? [];
+  const baseColumns = responseExportOptions?.baseColumns ?? [];
+  const availableQuestionIdSet = new Set(
+    selectedGroupIds.length > 0
+      ? questionGroups
+        .filter((group: any) => selectedGroupIds.includes(group.id))
+        .flatMap((group: any) => group.items?.map((item: any) => item.questionId) ?? [])
+      : questions.map((question: any) => question.id),
+  );
+  const filteredQuestions = questions.filter((question: any) => availableQuestionIdSet.has(question.id));
+
+  function toggleString(list: string[], value: string) {
+    return list.includes(value) ? list.filter((item) => item !== value) : [...list, value];
+  }
+
+  function toggleGroup(groupId: string) {
+    setSelectedGroupIds((prev) => {
+      const next = toggleString(prev, groupId);
+      const activeIds = next.length > 0 ? next : [];
+      const allowedQuestionIds = new Set(
+        activeIds.length > 0
+          ? questionGroups
+            .filter((group: any) => activeIds.includes(group.id))
+            .flatMap((group: any) => group.items?.map((item: any) => item.questionId) ?? [])
+          : questions.map((question: any) => question.id),
+      );
+      setSelectedQuestionIds((current) => current.filter((questionId) => allowedQuestionIds.has(questionId)));
+      return next;
+    });
+  }
+
+  function toggleDate(dateValue: string) {
+    setSelectedDates((prev) => toggleString(prev, dateValue));
+  }
+
+  function toggleColumn(columnKey: string) {
+    setSelectedColumnKeys((prev) => toggleString(prev, columnKey));
+  }
+
+  function toggleQuestion(questionId: string) {
+    setSelectedQuestionIds((prev) => toggleString(prev, questionId));
+  }
+
+  function downloadCsv() {
+    if (selectedQuestionIds.length === 0) {
+      setError('CSVに含める質問を1つ以上選択してください');
+      return;
+    }
+    setError('');
+    startTransition(async () => {
+      try {
+        const result = await exportModelResponsesCsv(modelId, {
+          questionGroupIds: selectedGroupIds,
+          dates: selectedDates,
+          columnKeys: selectedColumnKeys,
+          questionIds: selectedQuestionIds,
+          useDisplayText,
+        });
+        const blob = new Blob([result.csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = result.filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      } catch (e: any) {
+        setError(e.message);
+      }
+    });
+  }
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-base font-semibold text-gray-800">回答CSVエクスポート</h2>
+        <p className="text-xs text-gray-400 mt-0.5">
+          質問グループ、日付、出力列、質問項目を選んでCSVをダウンロードできます。
+        </p>
+      </div>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <div className="xl:col-span-1 space-y-4">
+          <div className="bg-white border border-gray-100 rounded-lg p-4 shadow-sm">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-gray-800">質問グループ</h3>
+              <button type="button" onClick={() => setSelectedGroupIds([])} className="text-xs text-blue-600 hover:underline">
+                すべて対象
+              </button>
+            </div>
+            <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+              {questionGroups.map((group: any) => {
+                const checked = selectedGroupIds.length === 0 || selectedGroupIds.includes(group.id);
+                return (
+                  <label key={group.id} className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer ${checked ? 'border-blue-200 bg-blue-50' : 'border-gray-100 hover:border-gray-200'}`}>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleGroup(group.id)}
+                      className="mt-1"
+                    />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-800">{group.name}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{group._count?.sessions ?? 0} セッション</p>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="bg-white border border-gray-100 rounded-lg p-4 shadow-sm">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-gray-800">日付</h3>
+              <button type="button" onClick={() => setSelectedDates([])} className="text-xs text-blue-600 hover:underline">
+                すべて対象
+              </button>
+            </div>
+            <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+              {availableDateOptions.map((date: any) => {
+                const checked = selectedDates.length === 0 || selectedDates.includes(date.value);
+                return (
+                  <label key={date.value} className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer ${checked ? 'border-blue-200 bg-blue-50' : 'border-gray-100 hover:border-gray-200'}`}>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleDate(date.value)}
+                    />
+                    <div className="min-w-0">
+                      <p className="text-sm text-gray-800">{date.label}</p>
+                      <p className="text-xs text-gray-400">{date.count} セッション</p>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="bg-white border border-gray-100 rounded-lg p-4 shadow-sm">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-gray-800">基本列</h3>
+              <button type="button" onClick={() => setSelectedColumnKeys(DEFAULT_EXPORT_COLUMNS)} className="text-xs text-blue-600 hover:underline">
+                初期値に戻す
+              </button>
+            </div>
+            <div className="space-y-2">
+              {baseColumns.map((column: any) => (
+                <label key={column.key} className="flex items-center gap-3 rounded-lg border border-gray-100 p-3 cursor-pointer hover:border-gray-200">
+                  <input
+                    type="checkbox"
+                    checked={selectedColumnKeys.includes(column.key)}
+                    onChange={() => toggleColumn(column.key)}
+                  />
+                  <span className="text-sm text-gray-800">{column.label}</span>
+                </label>
+              ))}
+            </div>
+            <label className="mt-3 flex items-center gap-2 text-xs text-gray-600">
+              <input
+                type="checkbox"
+                checked={useDisplayText}
+                onChange={(e) => setUseDisplayText(e.target.checked)}
+              />
+              質問グループの表示文がある場合はヘッダーに優先して使う
+            </label>
+          </div>
+        </div>
+
+        <div className="xl:col-span-2 bg-white border border-gray-100 rounded-lg p-4 shadow-sm">
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-800">質問項目</h3>
+              <p className="text-xs text-gray-400 mt-0.5">
+                チェックした質問だけをCSV列に含めます。ヘッダーは質問文です。
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedQuestionIds(filteredQuestions.map((question: any) => question.id))}
+                className="text-xs text-blue-600 hover:underline"
+              >
+                表示中を全選択
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedQuestionIds([])}
+                className="text-xs text-gray-500 hover:underline"
+              >
+                全解除
+              </button>
+            </div>
+          </div>
+
+          <div className="mb-4 flex items-center justify-between rounded-lg border border-blue-100 bg-blue-50 px-4 py-3">
+            <div className="text-sm text-blue-900">
+              基本列 {selectedColumnKeys.length} 件 / 質問列 {selectedQuestionIds.length} 件
+            </div>
+            <button
+              type="button"
+              onClick={downloadCsv}
+              disabled={isPending}
+              className="inline-flex items-center gap-1.5 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+            >
+              <Download size={14} />
+              {isPending ? '生成中...' : 'CSVダウンロード'}
+            </button>
+          </div>
+
+          <div className="max-h-[640px] overflow-y-auto space-y-2 pr-1">
+            {filteredQuestions.map((question: any) => {
+              const checked = selectedQuestionIds.includes(question.id);
+              return (
+                <label
+                  key={question.id}
+                  className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer ${checked ? 'border-blue-200 bg-blue-50' : 'border-gray-100 hover:border-gray-200'}`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggleQuestion(question.id)}
+                    className="mt-1"
+                  />
+                  <div className="min-w-0">
+                    <p className="text-xs text-gray-400 mb-1">{question.axisBreadcrumb.join(' › ')}</p>
+                    <p className="text-sm text-gray-800 leading-relaxed">{question.text}</p>
+                  </div>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function SnapshotConfirmModal({
   fromVersion,
@@ -762,7 +1031,14 @@ function QuestionGroupsTab({
   );
 }
 
-export function ModelDetailTabs({ modelId, axes, outputFormats, questionGroups, model }: Props) {
+export function ModelDetailTabs({
+  modelId,
+  axes,
+  outputFormats,
+  questionGroups,
+  model,
+  responseExportOptions,
+}: Props) {
   const [activeTab, setActiveTab] = useState<TabKey>('axes');
 
   const flatten = (list: any[]): any[] =>
@@ -849,6 +1125,15 @@ export function ModelDetailTabs({ modelId, axes, outputFormats, questionGroups, 
       {/* 質問グループタブ */}
       {activeTab === 'question-groups' && (
         <QuestionGroupsTab modelId={modelId} questionGroups={questionGroups} questions={allQuestions} />
+      )}
+
+      {activeTab === 'csv-export' && (
+        <ResponseExportTab
+          modelId={modelId}
+          questionGroups={questionGroups}
+          questions={allQuestions}
+          responseExportOptions={responseExportOptions}
+        />
       )}
 
       {/* 設定タブ */}

@@ -259,6 +259,30 @@ export async function updateOutputFormat(
   return json.data ?? json;
 }
 
+export async function exportModelResponsesCsv(
+  modelId: string,
+  data: {
+    questionGroupIds?: string[];
+    dates?: string[];
+    columnKeys?: string[];
+    questionIds?: string[];
+    useDisplayText?: boolean;
+  },
+) {
+  const token = await getToken();
+  const res = await fetch(`${API}/evaluation-models/${modelId}/responses/export`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(err.message ?? 'CSVエクスポートに失敗しました');
+  }
+  const json = await res.json();
+  return json.data ?? json;
+}
+
 // 出力形式を削除
 export async function deleteOutputFormat(modelId: string, formatId: string) {
   const token = await getToken();

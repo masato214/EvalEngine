@@ -11,6 +11,26 @@ export interface CreateModelDto {
   projectId: string;
 }
 
+const EXPORTABLE_BASE_COLUMNS = [
+  { key: 'answeredAt', label: '回答日時' },
+  { key: 'sessionDate', label: 'アンケート日' },
+  { key: 'questionGroup', label: '質問グループ' },
+  { key: 'respondentId', label: '回答者ID' },
+  { key: 'respondentName', label: '回答者名' },
+  { key: 'sessionStatus', label: 'ステータス' },
+  { key: 'sessionId', label: 'セッションID' },
+] as const;
+
+type ExportableBaseColumnKey = (typeof EXPORTABLE_BASE_COLUMNS)[number]['key'];
+
+interface ExportResponsesCsvDto {
+  questionGroupIds?: string[];
+  dates?: string[];
+  columnKeys?: string[];
+  questionIds?: string[];
+  useDisplayText?: boolean;
+}
+
 /** Decode a Bytes-stored Float32 embedding buffer back to number[] */
 function decodeEmbedding(buf: unknown): number[] | undefined {
   if (!buf) return undefined;
@@ -20,6 +40,23 @@ function decodeEmbedding(buf: unknown): number[] | undefined {
   } catch {
     return undefined;
   }
+}
+
+function csvEscape(value: unknown) {
+  const text = value === null || value === undefined ? '' : String(value);
+  if (/[",\n]/.test(text)) return `"${text.replace(/"/g, '""')}"`;
+  return text;
+}
+
+function normalizeDateKey(value: Date | string | null | undefined) {
+  if (!value) return '';
+  return new Date(value).toISOString().slice(0, 10);
+}
+
+function optionLabel(option: any, orderIndex: number) {
+  const parts = [`${orderIndex + 1}. ${option.label ?? option.value}`];
+  if (option.text && option.text !== option.label) parts.push(`(${option.text})`);
+  return parts.join(' ');
 }
 
 @Injectable()
@@ -167,6 +204,212 @@ export class EvaluationModelsService {
     return this.prisma.resultTemplate.findUnique({ where: { modelId } });
   }
 
+  async getResponseExportOptions(modelId: string, tenantId: string | undefined) {
+    const model = await this.prisma.evaluationModel.findFirst({
+      where: tenantId ? { id: modelId, tenantId } : { id: modelId },
+      include: {
+        questionGroups: {
+          orderBy: { order: 'asc' },
+          select: {
+            id: true,
+            name: true,
+            groupType: true,
+            items: {
+              orderBy: { order: 'asc' },
+              select: { questionId: true },
+            },
+            _count: { select: { sessions: true } },
+          },
+        },
+      },
+    });
+    if (!model) throw new NotFoundException('Evaluation model not found');
+
+    const sessions = await this.prisma.session.findMany({
+      where: {
+        modelId,
+        ...(tenantId ? { tenantId } : {}),
+      },
+      select: {
+        id: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const dates = Array.from(
+      sessions.reduce((map, session) => {
+        const key = normalizeDateKey(session.createdAt);
+        map.set(key, (map.get(key) ?? 0) + 1);
+        return map;
+      }, new Map<string, number>()),
+    )
+      .map(([value, count]) => ({ value, label: value.replace(/-/g, '/'), count }))
+      .sort((a, b) => b.value.localeCompare(a.value));
+
+    return {
+      dates,
+      questionGroups: model.questionGroups.map((group) => ({
+        id: group.id,
+        name: group.name,
+        groupType: group.groupType,
+        questionIds: group.items.map((item) => item.questionId),
+        sessionCount: group._count.sessions,
+      })),
+      baseColumns: EXPORTABLE_BASE_COLUMNS,
+    };
+  }
+
+  async exportResponsesCsv(modelId: string, tenantId: string | undefined, dto: ExportResponsesCsvDto) {
+    const model = await this.prisma.evaluationModel.findFirst({
+      where: tenantId ? { id: modelId, tenantId } : { id: modelId },
+      include: {
+        questionGroups: {
+          orderBy: { order: 'asc' },
+          include: {
+            items: {
+              orderBy: { order: 'asc' },
+              include: {
+                question: {
+                  include: {
+                    options: { orderBy: { order: 'asc' } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!model) throw new NotFoundException('Evaluation model not found');
+
+    const allQuestions = await this.prisma.question.findMany({
+      where: { modelId },
+      include: {
+        options: { orderBy: { order: 'asc' } },
+      },
+      orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
+    });
+
+    const questionById = new Map(allQuestions.map((question) => [question.id, question]));
+    const selectedGroupIds = [...new Set(dto.questionGroupIds ?? [])];
+    const selectedDates = new Set((dto.dates ?? []).filter(Boolean));
+    const defaultQuestionIds = selectedGroupIds.length > 0
+      ? model.questionGroups
+        .filter((group) => selectedGroupIds.includes(group.id))
+        .flatMap((group) => group.items.map((item) => item.questionId))
+      : allQuestions.map((question) => question.id);
+    const requestedQuestionIds = dto.questionIds?.length ? dto.questionIds : defaultQuestionIds;
+    const selectedQuestionIds = Array.from(new Set(requestedQuestionIds)).filter((questionId) => questionById.has(questionId));
+
+    if (selectedQuestionIds.length === 0) {
+      throw new BadRequestException('CSVに含める質問が選択されていません');
+    }
+
+    const selectedColumnKeys = ((dto.columnKeys?.length ? dto.columnKeys : ['answeredAt', 'sessionDate', 'questionGroup', 'respondentId', 'respondentName']) as string[])
+      .filter((key): key is ExportableBaseColumnKey => EXPORTABLE_BASE_COLUMNS.some((column) => column.key === key));
+
+    const sessions = await this.prisma.session.findMany({
+      where: {
+        modelId,
+        ...(tenantId ? { tenantId } : {}),
+        ...(selectedGroupIds.length > 0 ? { questionGroupId: { in: selectedGroupIds } } : {}),
+      },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      include: {
+        questionGroup: { select: { id: true, name: true } },
+        answers: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: {
+            id: true,
+            respondentRef: true,
+            respondentMeta: true,
+            status: true,
+            createdAt: true,
+            items: {
+              orderBy: { createdAt: 'asc' },
+              select: { questionId: true, value: true },
+            },
+          },
+        },
+      },
+    });
+
+    const filteredSessions = sessions.filter((session) => {
+      if (selectedDates.size === 0) return true;
+      return selectedDates.has(normalizeDateKey(session.createdAt));
+    });
+
+    const displayTextByQuestionId = new Map<string, string>();
+    if (dto.useDisplayText !== false && selectedGroupIds.length === 1) {
+      const group = model.questionGroups.find((item) => item.id === selectedGroupIds[0]);
+      for (const item of group?.items ?? []) {
+        if (item.displayText) displayTextByQuestionId.set(item.questionId, item.displayText);
+      }
+    }
+
+    const orderedSelectedQuestions = allQuestions
+      .filter((question) => selectedQuestionIds.includes(question.id))
+      .map((question) => ({
+        ...question,
+        headerText: displayTextByQuestionId.get(question.id) ?? question.text,
+      }));
+
+    const rows = filteredSessions.map((session, index) => {
+      const latestAnswer = session.answers[0] ?? null;
+      const answerItems = new Map((latestAnswer?.items ?? []).map((item) => [item.questionId, item.value]));
+      const respondentName = latestAnswer?.respondentMeta && typeof latestAnswer.respondentMeta === 'object'
+        ? (latestAnswer.respondentMeta as Record<string, unknown>).name
+        : null;
+      const baseValues: Record<ExportableBaseColumnKey, string> = {
+        answeredAt: latestAnswer?.createdAt ? new Date(latestAnswer.createdAt).toLocaleString('ja-JP') : '',
+        sessionDate: session.createdAt ? new Date(session.createdAt).toLocaleDateString('ja-JP') : '',
+        questionGroup: session.questionGroup?.name ?? '',
+        respondentId: latestAnswer?.respondentRef ?? session.userExternalId,
+        respondentName: respondentName ? String(respondentName) : '',
+        sessionStatus: session.status,
+        sessionId: session.id,
+      };
+
+      const questionValues = orderedSelectedQuestions.map((question) => (
+        this.formatCsvAnswerValue(question, answerItems.get(question.id))
+      ));
+
+      return [
+        String(index + 1),
+        ...selectedColumnKeys.map((key) => baseValues[key]),
+        ...questionValues,
+      ];
+    });
+
+    const headerRow = [
+      'No',
+      ...selectedColumnKeys.map((key) => EXPORTABLE_BASE_COLUMNS.find((column) => column.key === key)?.label ?? key),
+      ...orderedSelectedQuestions.map((question) => question.headerText),
+    ];
+
+    const csv = [
+      headerRow,
+      ...rows,
+    ]
+      .map((row) => row.map((value) => csvEscape(value)).join(','))
+      .join('\n');
+
+    const groupPart = selectedGroupIds.length === 1
+      ? model.questionGroups.find((group) => group.id === selectedGroupIds[0])?.name ?? 'filtered'
+      : 'all-groups';
+    const filename = `responses-${model.name}-${groupPart}-${new Date().toISOString().slice(0, 10)}.csv`
+      .replace(/[\\/:*?"<>|]/g, '_');
+
+    return {
+      filename,
+      csv,
+      rowCount: rows.length,
+      questionCount: orderedSelectedQuestions.length,
+    };
+  }
+
   async upsertResultTemplate(
     modelId: string,
     tenantId: string,
@@ -178,6 +421,44 @@ export class EvaluationModelsService {
       create: { modelId, ...dto },
       update: dto,
     });
+  }
+
+  private formatCsvAnswerValue(question: any, rawValue: unknown) {
+    if (rawValue === null || rawValue === undefined || rawValue === '') return '';
+
+    if (question.type === 'SINGLE_CHOICE') {
+      const selected = question.options?.find((option: any) => option.value === String(rawValue));
+      if (!selected) return String(rawValue);
+      const orderIndex = question.options.findIndex((option: any) => option.id === selected.id);
+      return optionLabel(selected, orderIndex >= 0 ? orderIndex : 0);
+    }
+
+    if (question.type === 'MULTIPLE_CHOICE') {
+      const values = Array.isArray(rawValue) ? rawValue.map(String) : [String(rawValue)];
+      return values
+        .map((value) => {
+          const selected = question.options?.find((option: any) => option.value === value);
+          if (!selected) return value;
+          const orderIndex = question.options.findIndex((option: any) => option.id === selected.id);
+          return optionLabel(selected, orderIndex >= 0 ? orderIndex : 0);
+        })
+        .join(' / ');
+    }
+
+    if (question.type === 'SCALE') {
+      const numericValue = Number(rawValue);
+      if (Number.isFinite(numericValue)) {
+        if (question.scaleMinLabel && numericValue === question.scaleMin) {
+          return `${numericValue} (${question.scaleMinLabel})`;
+        }
+        if (question.scaleMaxLabel && numericValue === question.scaleMax) {
+          return `${numericValue} (${question.scaleMaxLabel})`;
+        }
+        return String(numericValue);
+      }
+    }
+
+    return String(rawValue);
   }
 
   async create(tenantId: string, dto: CreateModelDto) {

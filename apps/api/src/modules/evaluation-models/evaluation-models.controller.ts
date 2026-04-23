@@ -1,6 +1,8 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
-import { IsString, IsOptional, IsObject, IsArray } from 'class-validator';
+import {
+  IsString, IsOptional, IsObject, IsArray, IsBoolean,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { EvaluationModelsService } from './evaluation-models.service';
 import { PaginationDto } from '../../common/dto/pagination.dto';
@@ -32,6 +34,23 @@ class UpsertResultTemplateBody {
   @ApiPropertyOptional() @IsOptional() @IsString() promptTemplate?: string;
 }
 
+class ExportResponsesCsvBody {
+  @ApiPropertyOptional({ type: [String], description: '対象の質問グループID。未指定なら全質問グループを対象にする' })
+  @IsOptional() @IsArray() @IsString({ each: true }) questionGroupIds?: string[];
+
+  @ApiPropertyOptional({ type: [String], description: '対象の日付（YYYY-MM-DD）。未指定なら全日付を対象にする' })
+  @IsOptional() @IsArray() @IsString({ each: true }) dates?: string[];
+
+  @ApiPropertyOptional({ type: [String], description: 'CSVに含める基本列キー' })
+  @IsOptional() @IsArray() @IsString({ each: true }) columnKeys?: string[];
+
+  @ApiPropertyOptional({ type: [String], description: 'CSVに含める質問ID。未指定なら対象質問をすべて含める' })
+  @IsOptional() @IsArray() @IsString({ each: true }) questionIds?: string[];
+
+  @ApiPropertyOptional({ description: '質問グループの表示文がある場合はヘッダーに優先して使う', default: true })
+  @IsOptional() @IsBoolean() useDisplayText?: boolean;
+}
+
 @ApiTags('evaluation-models')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
@@ -49,6 +68,12 @@ export class EvaluationModelsController {
   @ApiOperation({ summary: '評価モデル詳細', description: '評価軸ツリー・質問・出力形式・ルーブリックレベルを含む全詳細を取得します。' })
   findOne(@Param('id') id: string, @CurrentTenant() tenantId: string) {
     return this.service.findOne(id, tenantId);
+  }
+
+  @Get(':id/responses/export-options')
+  @ApiOperation({ summary: '回答CSVエクスポート候補取得', description: '回答CSV出力に使う日付候補・質問グループ候補・基本列候補を返します。' })
+  getResponseExportOptions(@Param('id') id: string, @CurrentTenant() tenantId: string) {
+    return this.service.getResponseExportOptions(id, tenantId);
   }
 
   @Post()
@@ -105,5 +130,15 @@ export class EvaluationModelsController {
     @Body() dto: UpsertResultTemplateBody,
   ) {
     return this.service.upsertResultTemplate(id, tenantId, dto);
+  }
+
+  @Post(':id/responses/export')
+  @ApiOperation({ summary: '回答CSVエクスポート', description: '評価モデルごとの回答を、質問・質問グループ・日付・列選択に応じてCSV化します。' })
+  exportResponsesCsv(
+    @Param('id') id: string,
+    @CurrentTenant() tenantId: string,
+    @Body() dto: ExportResponsesCsvBody,
+  ) {
+    return this.service.exportResponsesCsv(id, tenantId, dto);
   }
 }

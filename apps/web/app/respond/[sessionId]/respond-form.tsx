@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { ChevronLeft, ChevronRight, Send, CheckCircle, Loader2 } from 'lucide-react';
+import { getApiBaseUrl } from '@/lib/runtime-config';
 
 interface Question {
   id: string;
@@ -15,7 +16,7 @@ interface Question {
   options?: { id: string; label: string; value: string; order: number }[];
 }
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api/v1';
+const API = getApiBaseUrl();
 
 async function submitAnswers(
   sessionId: string,

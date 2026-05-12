@@ -3,9 +3,10 @@
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
+import { getApiBaseUrl } from '@/lib/runtime-config';
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api/v1';
-const AI_SERVICE = process.env.AI_SERVICE_URL ?? 'http://127.0.0.1:8000';
+const API = getApiBaseUrl();
+const AI_SERVICE = process.env.AI_SERVICE_URL?.trim()?.replace(/\/$/, '') ?? 'https://evalengine-ai.onrender.com';
 const AI_INTERNAL_KEY = process.env.AI_INTERNAL_KEY ?? '';
 
 async function getToken() {

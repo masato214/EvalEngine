@@ -3,8 +3,9 @@
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
+import { getApiBaseUrl } from '@/lib/runtime-config';
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api/v1';
+const API = getApiBaseUrl();
 
 async function getToken() {
   const session = await getServerSession(authOptions);

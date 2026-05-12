@@ -1,7 +1,8 @@
 import type { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
+import { getApiBaseUrl } from './runtime-config';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api/v1';
+const API_URL = getApiBaseUrl();
 
 // アクセストークンの有効期限（秒）。APIの JWT_EXPIRY と合わせる。
 const ACCESS_TOKEN_EXPIRY_SEC = parseInt(process.env.JWT_EXPIRY_SEC ?? '840', 10); // default 14 min

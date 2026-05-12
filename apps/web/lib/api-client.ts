@@ -1,4 +1,6 @@
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api/v1';
+import { getApiBaseUrl } from './runtime-config';
+
+const BASE_URL = getApiBaseUrl();
 
 type ApiRequestOptions = {
   tenantId?: string;
@@ -17,7 +19,12 @@ async function request<T>(
   if (token) (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
   if (requestOptions.tenantId) (headers as Record<string, string>)['x-tenant-id'] = requestOptions.tenantId;
 
-  const res = await fetch(`${BASE_URL}${path}`, { ...options, headers });
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}${path}`, { ...options, headers });
+  } catch {
+    throw new Error(`API request failed: ${path}`);
+  }
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ message: res.statusText }));

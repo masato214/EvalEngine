@@ -1,26 +1,35 @@
 import { notFound } from 'next/navigation';
 import { RespondForm } from './respond-form';
+import { getApiBaseUrl } from '@/lib/runtime-config';
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api/v1';
+const API = getApiBaseUrl();
 
 async function fetchQuestions(sessionId: string, apiKey: string) {
-  const res = await fetch(`${API}/sessions/${sessionId}/questions`, {
-    headers: { 'x-api-key': apiKey },
-    cache: 'no-store',
-  });
-  if (!res.ok) return null;
-  const json = await res.json();
-  return json.data ?? json;
+  try {
+    const res = await fetch(`${API}/sessions/${sessionId}/questions`, {
+      headers: { 'x-api-key': apiKey },
+      cache: 'no-store',
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json.data ?? json;
+  } catch {
+    return null;
+  }
 }
 
 async function fetchSession(sessionId: string, apiKey: string) {
-  const res = await fetch(`${API}/sessions/${sessionId}`, {
-    headers: { 'x-api-key': apiKey },
-    cache: 'no-store',
-  });
-  if (!res.ok) return null;
-  const json = await res.json();
-  return json.data ?? json;
+  try {
+    const res = await fetch(`${API}/sessions/${sessionId}`, {
+      headers: { 'x-api-key': apiKey },
+      cache: 'no-store',
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json.data ?? json;
+  } catch {
+    return null;
+  }
 }
 
 export default async function RespondPage({

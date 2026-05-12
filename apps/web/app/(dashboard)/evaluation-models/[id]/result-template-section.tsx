@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { getApiBaseUrl } from '@/lib/runtime-config';
 
 const OUTPUT_TYPES = [
   {
@@ -41,7 +42,7 @@ const OUTPUT_TYPES = [
   },
 ];
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api/v1';
+const API = getApiBaseUrl();
 
 export function ResultTemplateSection({
   modelId,

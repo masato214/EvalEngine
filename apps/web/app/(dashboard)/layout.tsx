@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import { Sidebar } from '@/components/layout/sidebar';
@@ -14,7 +15,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <div className="flex h-screen">
-      {isSuperAdmin ? <Sidebar /> : <PortalSidebar role={role} />}
+      {isSuperAdmin ? <Sidebar /> : (
+        <Suspense fallback={<div className="w-56 flex-shrink-0 bg-white border-r border-gray-100" />}>
+          <PortalSidebar role={role} />
+        </Suspense>
+      )}
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header />
         <main className="flex-1 overflow-auto p-6">{children}</main>

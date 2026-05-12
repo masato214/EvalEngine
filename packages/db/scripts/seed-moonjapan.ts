@@ -318,6 +318,12 @@ function rootCategory(axisId: string) {
   return axisId.match(/^mj-axis-([A-G])/)?.[1] ?? 'unknown';
 }
 
+const pulseRotationSets = {
+  alpha: ['本質把握力', '価値観認識力', '多角的視点', '論理的思考力', '説得・独自性', '粘り強さ／グリット', '役割遂行力'],
+  beta: ['仮説・目的明確化力', '強み・弱み把握力', '計画力', '構造的把握力', '伝達力', '改善・展開力', '共感的コミュニケーション・支援'],
+  gamma: ['問い設定力', '自己モニタリング', '検索・取材力', '関連付け・発想力', '構成・要約力', '知的好奇心', '調整・建設的介入'],
+} as const;
+
 const agefGDisplayText: Record<string, string> = {
   'G1-A': '自分がミスをしたとき、誰かのせいにしたり言い訳をしたりせず、すぐに自分の非を認める方だ。',
   'G1-B': '自分にとって不利な状況であっても、自分を正当化する嘘をつかずに、正直でいられる。',
@@ -620,6 +626,83 @@ async function main() {
     });
   }
 
+  const axisByName = new Map(leafAxes.map((axis) => [axis.name, axis]));
+  const dQuestions = questions.filter((question) => rootCategory(question.axisId) === 'D');
+  const pulseGroups = [
+    {
+      id: 'mj-qg-pulse-alpha',
+      key: 'alpha',
+      name: '質問グループ4: パルス調査 α',
+      order: 3,
+    },
+    {
+      id: 'mj-qg-pulse-beta',
+      key: 'beta',
+      name: '質問グループ5: パルス調査 β',
+      order: 4,
+    },
+    {
+      id: 'mj-qg-pulse-gamma',
+      key: 'gamma',
+      name: '質問グループ6: パルス調査 γ',
+      order: 5,
+    },
+  ] as const;
+
+  for (const pulseGroup of pulseGroups) {
+    const selectedAxisNames = pulseRotationSets[pulseGroup.key];
+    const bcQuestions = selectedAxisNames.flatMap((axisName) => {
+      const axis = axisByName.get(axisName);
+      if (!axis) throw new Error(`Pulse rotation axis not found: ${axisName}`);
+      return questions.filter((question) => question.axisId === axis.id);
+    });
+    const pulseQuestions = [...dQuestions, ...bcQuestions];
+    const group = await prisma.questionGroup.create({
+      data: {
+        id: pulseGroup.id,
+        modelId: model.id,
+        name: pulseGroup.name,
+        description: `高頻度・縦断調査用の17問セット。Dの3問を固定し、B/Cの7次元14問を${pulseGroup.key}セットとしてローテーションする。`,
+        groupType: QuestionGroupType.DAILY,
+        order: pulseGroup.order,
+        config: {
+          coverage: ['B', 'C', 'D'],
+          questionCount: pulseQuestions.length,
+          fixedQuestions: dQuestions.map((question) => question.code),
+          rotationAxisNames: selectedAxisNames,
+          policy: [
+            'D.熱量の変化 3問は毎回固定',
+            'B/Cは7次元を2問ずつ、計14問をセット単位でローテーション',
+            '合計17問前後で3〜5分のパルス回答を想定',
+          ],
+        },
+      },
+    });
+
+    for (const [index, question] of pulseQuestions.entries()) {
+      const category = rootCategory(question.axisId);
+      await prisma.questionGroupItem.create({
+        data: {
+          id: `mj-qgi-pulse-${pulseGroup.key}-${questionId(question.code)}`,
+          groupId: group.id,
+          questionId: questionId(question.code),
+          displayText: category === 'D' ? question.text : stripPairedPrefix(question.text),
+          order: index,
+          block: category === 'D' ? 'D. 熱量の変化' : 'B/C ローテーション',
+          shuffleGroup: category === 'D' ? `pulse-${pulseGroup.key}-d` : `pulse-${pulseGroup.key}-bc`,
+          metadata: {
+            code: question.code,
+            axisId: question.axisId,
+            rootCategory: category,
+            rotationSet: pulseGroup.key,
+            compressed: false,
+            source: '2026-05 調査負荷改善ローテーション設計',
+          },
+        },
+      });
+    }
+  }
+
   await prisma.resultTemplate.create({
     data: {
       modelId: model.id,
@@ -636,11 +719,7 @@ async function main() {
           F: 0.15,
           G: 0.05,
         },
-        rotationSets: {
-          alpha: ['本質把握力', '価値観認識力', '多角的視点', '論理的思考力', '説得・独自性', '粘り強さ／グリット', '役割遂行力'],
-          beta: ['仮説・目的明確化力', '強み・弱み把握力', '計画力', '構造的把握力', '伝達力', '改善・展開力', '共感的コミュニケーション・支援'],
-          gamma: ['問い設定力', '自己モニタリング', '検索・取材力', '関連付け・発想力', '構成・要約力', '知的好奇心', '調整・建設的介入'],
-        },
+        rotationSets: pulseRotationSets,
         interpretationPolicy: [
           'Aは静的なP-O Fit基礎変数として期初測定を想定する。',
           'B/C/D/E/Fは動的・縦断的な成長軌跡として解釈する。',

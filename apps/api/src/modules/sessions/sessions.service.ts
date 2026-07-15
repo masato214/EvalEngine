@@ -1,9 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { InjectQueue } from '@nestjs/bullmq';
-import { Queue } from 'bullmq';
 import { SessionStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
-import { QUEUE_NAMES } from '@evalengine/config';
+import { AnalysisDispatcher } from '../analysis/analysis.dispatcher';
 
 export interface CreateSessionDto {
   modelId: string;
@@ -35,7 +33,7 @@ function uniqueStrings(values?: string[]) {
 export class SessionsService {
   constructor(
     private prisma: PrismaService,
-    @InjectQueue(QUEUE_NAMES.ANALYSIS) private analysisQueue: Queue,
+    private analysisDispatcher: AnalysisDispatcher,
   ) {}
 
   /** POST /sessions */
@@ -225,7 +223,7 @@ export class SessionsService {
       where: { id: sessionId },
       data: { status: SessionStatus.ANALYZING },
     });
-    await this.analysisQueue.add('analyze', { answerId: answer.id, tenantId });
+    this.analysisDispatcher.dispatch(answer.id, tenantId);
 
     return { answerId: answer.id, status: 'PENDING' };
   }
@@ -254,7 +252,7 @@ export class SessionsService {
       data: { status: SessionStatus.ANALYZING },
     });
 
-    await this.analysisQueue.add('analyze', { answerId: answer.id, tenantId });
+    this.analysisDispatcher.dispatch(answer.id, tenantId);
 
     return { status: 'PROCESSING', answerId: answer.id };
   }

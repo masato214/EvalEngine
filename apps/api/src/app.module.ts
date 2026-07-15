@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
-import { BullModule } from '@nestjs/bullmq';
 import { AppController } from './app.controller';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -23,9 +22,6 @@ import { QuestionGroupsModule } from './modules/question-groups/question-groups.
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
-    BullModule.forRoot({
-      connection: { url: process.env.REDIS_URL ?? 'redis://localhost:6379' },
-    }),
     PrismaModule,
     AuthModule,
     TenantsModule,

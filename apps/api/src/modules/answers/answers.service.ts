@@ -1,8 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectQueue } from '@nestjs/bullmq';
-import { Queue } from 'bullmq';
 import { PrismaService } from '../../prisma/prisma.service';
-import { QUEUE_NAMES } from '@evalengine/config';
+import { AnalysisDispatcher } from '../analysis/analysis.dispatcher';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 
 export interface SubmitAnswerDto {
@@ -16,7 +14,7 @@ export interface SubmitAnswerDto {
 export class AnswersService {
   constructor(
     private prisma: PrismaService,
-    @InjectQueue(QUEUE_NAMES.ANALYSIS) private analysisQueue: Queue,
+    private analysisDispatcher: AnalysisDispatcher,
   ) {}
 
   async submit(tenantId: string, dto: SubmitAnswerDto) {
@@ -41,7 +39,7 @@ export class AnswersService {
       include: { items: true },
     });
 
-    await this.analysisQueue.add('analyze', { answerId: answer.id, tenantId });
+    this.analysisDispatcher.dispatch(answer.id, tenantId);
 
     return { answerId: answer.id, status: 'PENDING' };
   }

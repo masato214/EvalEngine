@@ -1,0 +1,17 @@
+{
+  "installCommand": "pnpm install --prod=false",
+  "buildCommand": "pnpm --filter @evalengine/db db:generate && pnpm turbo run build --filter=@evalengine/api",
+  "rewrites": [{ "source": "/(.*)", "destination": "/api/index" }],
+  "functions": {
+    "api/index.js": {
+      "maxDuration": 300,
+      "includeFiles": "dist/**"
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/v1/analysis/sweep",
+      "schedule": "0 18 * * *"
+    }
+  ]
+}

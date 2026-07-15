@@ -8,6 +8,10 @@
 > - API は Render で継続運用とユーザーが決定 (Phase 3〜4 の Vercel 集約は当面実施しない)。
 > - 実際の旧構成は Neon (DB) + Render (API)。Railway は未使用 (トライアル失効・削除可)。
 > - Neon は解約可能。
+> - **同日追記**: 方針再変更により Vercel 集約を実施。BullMQ/Redis を廃止し
+>   waitUntil + 日次 sweep cron に置換。Vercel プロジェクト3つ
+>   (evalengine-api / evalengine-ai / evalengine-web) を作成・環境変数設定・
+>   プレビューデプロイ検証済み。本番昇格と Render 廃止は最終確認後。
 
 ## 決定事項
 

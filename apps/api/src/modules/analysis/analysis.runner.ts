@@ -1,10 +1,7 @@
-import { Processor, WorkerHost } from '@nestjs/bullmq';
-import { Logger } from '@nestjs/common';
-import { Job } from 'bullmq';
+import { Injectable, Logger } from '@nestjs/common';
 import { QuestionType } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AnalysisService } from './analysis.service';
-import { QUEUE_NAMES } from '@evalengine/config';
 import type { ScoringRequest, ScoringItem, AxisScoringInfo } from '@evalengine/types';
 
 interface AnalysisJob {
@@ -51,19 +48,17 @@ function outputTypeSections(outputType: string) {
   return ['summary', 'hiring_decision', 'role_fits', 'development_plan'];
 }
 
-@Processor(QUEUE_NAMES.ANALYSIS)
-export class AnalysisProcessor extends WorkerHost {
-  private readonly logger = new Logger(AnalysisProcessor.name);
+@Injectable()
+export class AnalysisRunner {
+  private readonly logger = new Logger(AnalysisRunner.name);
 
   constructor(
     private prisma: PrismaService,
     private analysisService: AnalysisService,
-  ) {
-    super();
-  }
+  ) {}
 
-  async process(job: Job<AnalysisJob>) {
-    const { answerId, tenantId } = job.data;
+  async run(job: AnalysisJob) {
+    const { answerId, tenantId } = job;
     this.logger.log(`Processing answer ${answerId}`);
 
     await this.prisma.answer.update({

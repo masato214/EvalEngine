@@ -1,8 +1,11 @@
 {
-  "rewrites": [{ "source": "/(.*)", "destination": "/api/index" }],
-  "functions": {
-    "api/index.py": {
-      "maxDuration": 300
+  "installCommand": "echo 'skip js install'",
+  "buildCommand": "echo 'no build step'",
+  "builds": [
+    {
+      "src": "api/index.py",
+      "use": "@vercel/python"
     }
-  }
+  ],
+  "routes": [{ "src": "/(.*)", "dest": "/api/index.py" }]
 }

@@ -28,6 +28,7 @@
     "bcrypt": "^5.1.1",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
+    "express": "^4.19.2",
     "helmet": "^7.1.0",
     "passport": "^0.7.0",
     "passport-custom": "^1.1.1",
@@ -50,5 +51,12 @@
     "supertest": "^7.0.0",
     "ts-jest": "^29.1.4",
     "typescript": "^5.4.0"
+  },
+  "main": "dist/main.js",
+  "exports": {
+    "./vercel-server": {
+      "types": "./dist/vercel-server.d.ts",
+      "default": "./dist/vercel-server.js"
+    }
   }
 }

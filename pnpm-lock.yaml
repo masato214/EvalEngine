@@ -105,6 +105,9 @@ importers:
       class-validator:
         specifier: ^0.14.1
         version: 0.14.4
+      express:
+        specifier: ^4.19.2
+        version: 4.22.1
       helmet:
         specifier: ^7.1.0
         version: 7.2.0
@@ -169,6 +172,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@evalengine/api':
+        specifier: workspace:*
+        version: link:../api
       '@tanstack/react-query':
         specifier: ^5.45.0
         version: 5.96.2(react@18.3.1)

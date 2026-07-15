@@ -1,11 +1,8 @@
 {
-  "installCommand": "pnpm install --prod=false",
   "buildCommand": "pnpm turbo run build --filter=@evalengine/web",
-  "functions": {
-    "pages/api/v1/[...path].ts": {
-      "maxDuration": 300
-    }
-  },
+  "outputDirectory": "apps/web/.next",
+  "installCommand": "pnpm install --prod=false",
+  "framework": "nextjs",
   "crons": [
     {
       "path": "/api/v1/analysis/sweep",

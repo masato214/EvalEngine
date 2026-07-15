@@ -15,3 +15,5 @@ __pycache__/
 .DS_Store
 packages/db/scripts/supabase-migration/.work/
 .vercel
+apps/web/app/(demo)/
+apps/web/app/demo/

@@ -26,8 +26,8 @@ interface Props {
 }
 
 export function PortalSidebar({ tenantName, role }: Props) {
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
+  const pathname = usePathname() ?? '';
+  const searchParams = useSearchParams() ?? new URLSearchParams();
   const selectedTenantId = searchParams.get('tenantId');
   const withTenant = (href: string) => (selectedTenantId ? `${href}?tenantId=${encodeURIComponent(selectedTenantId)}` : href);
 

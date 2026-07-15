@@ -13,7 +13,7 @@ import { decodePayload, flattenAxes, getRubricColor, getBarColor, ResultPayload 
 // ── Shared header ──────────────────────────────────────────────────────────────
 
 export function ResultHeader({ payload, d }: { payload: ResultPayload; d: string }) {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? '';
   const base = pathname.replace(/\/(student|teacher)$/, '');
   const dateStr = new Date(payload.timestamp).toLocaleString('ja-JP', { dateStyle: 'short', timeStyle: 'short' });
 

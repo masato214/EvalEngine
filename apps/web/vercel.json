@@ -1,4 +1,15 @@
 {
   "installCommand": "pnpm install --prod=false",
-  "buildCommand": "pnpm turbo run build --filter=@evalengine/web"
+  "buildCommand": "pnpm turbo run build --filter=@evalengine/web",
+  "functions": {
+    "pages/api/v1/[...path].ts": {
+      "maxDuration": 300
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/v1/analysis/sweep",
+      "schedule": "0 18 * * *"
+    }
+  ]
 }

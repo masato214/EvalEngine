@@ -51,5 +51,12 @@
     "supertest": "^7.0.0",
     "ts-jest": "^29.1.4",
     "typescript": "^5.4.0"
+  },
+  "main": "dist/main.js",
+  "exports": {
+    "./vercel-server": {
+      "types": "./dist/vercel-server.d.ts",
+      "default": "./dist/vercel-server.js"
+    }
   }
 }

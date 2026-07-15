@@ -26,7 +26,10 @@ export async function getServer(): Promise<Express> {
 
   app.use(helmet());
   app.enableCors({
-    origin: process.env.ALLOWED_ORIGINS?.split(',') ?? ['http://localhost:3000'],
+    // ALLOWED_ORIGINS 未設定時は全オリジン許可 (リフレクト)。
+    // この API は Bearer/API キー認証で Cookie を使わないため、
+    // テナントの外部アプリ (moon-shot 等) がブラウザから直接呼べる必要がある。
+    origin: process.env.ALLOWED_ORIGINS?.split(',') ?? true,
     credentials: true,
   });
   app.setGlobalPrefix('api/v1');

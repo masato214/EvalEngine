@@ -4,6 +4,7 @@ import { ExpressAdapter } from '@nestjs/platform-express';
 import express, { Express } from 'express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { setupSwagger } from './swagger';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
@@ -39,6 +40,8 @@ export async function getServer(): Promise<Express> {
   );
   app.useGlobalFilters(new AllExceptionsFilter());
   app.useGlobalInterceptors(new LoggingInterceptor(), new TransformInterceptor());
+
+  setupSwagger(app, { useCdnAssets: true });
 
   await app.init();
   cachedServer = expressApp;

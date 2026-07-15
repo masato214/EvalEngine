@@ -408,7 +408,7 @@ x-api-key: ek_your_api_key_here`}
               <CopyButton text={`x-tenant-id: ${tenantId || 'tenant-moonjapan'}\nx-api-key: ek_your_api_key_here`} />
             </div>
             <p className="text-xs text-gray-500 mt-3">
-              ベースURL: <code className="bg-gray-100 px-1.5 py-0.5 rounded">https://evalengine-api-2aq8.onrender.com/api/v1</code>
+              ベースURL: <code className="bg-gray-100 px-1.5 py-0.5 rounded">https://eval-engine-rho.vercel.app/api/v1</code>
             </p>
           </div>
 
@@ -428,7 +428,7 @@ x-api-key: ek_your_api_key_here`}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <code className="text-sm font-mono text-gray-900">{ep.path}</code>
-                          <CopyButton text={`https://evalengine-api-2aq8.onrender.com/api/v1${ep.path}`} />
+                          <CopyButton text={`https://eval-engine-rho.vercel.app/api/v1${ep.path}`} />
                         </div>
                         <p className="text-sm text-gray-600 mt-1">{ep.desc}</p>
                         {ep.note && (
@@ -459,7 +459,7 @@ x-api-key: ek_your_api_key_here`}
               </p>
             </div>
             <a
-              href="https://evalengine-api-2aq8.onrender.com/api/docs"
+              href="https://eval-engine-rho.vercel.app/api/docs"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors flex-shrink-0 ml-4"

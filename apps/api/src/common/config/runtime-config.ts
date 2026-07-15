@@ -1,4 +1,4 @@
-const FALLBACK_AI_SERVICE_URL = 'https://evalengine-ai.onrender.com';
+const FALLBACK_AI_SERVICE_URL = 'https://evalengine-ai.vercel.app';
 
 export function getAiServiceUrl() {
   const configured = process.env.AI_SERVICE_URL?.trim();

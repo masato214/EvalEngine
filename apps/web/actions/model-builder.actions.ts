@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { getApiBaseUrl } from '@/lib/runtime-config';
 
 const API = getApiBaseUrl();
-const AI_SERVICE = process.env.AI_SERVICE_URL?.trim()?.replace(/\/$/, '') ?? 'https://evalengine-ai.onrender.com';
+const AI_SERVICE = process.env.AI_SERVICE_URL?.trim()?.replace(/\/$/, '') ?? 'https://evalengine-ai.vercel.app';
 const AI_INTERNAL_KEY = process.env.AI_INTERNAL_KEY ?? '';
 
 async function getToken() {

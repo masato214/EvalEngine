@@ -113,7 +113,7 @@ export default async function PortalSettingsPage() {
           <h2 className="text-sm font-semibold text-gray-800 mb-3">クイックリンク</h2>
           <div className="space-y-2">
             {[
-              { label: 'Swagger API ドキュメント', href: 'https://evalengine-api-2aq8.onrender.com/api/docs', external: true },
+              { label: 'Swagger API ドキュメント', href: 'https://eval-engine-rho.vercel.app/api/docs', external: true },
               { label: 'APIキー管理', href: '/api-keys', external: false },
               ...(isSuperAdmin ? [{ label: 'ユーザー管理', href: '/users', external: false }] : []),
             ].map((item) => (

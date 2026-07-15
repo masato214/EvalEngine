@@ -14,6 +14,10 @@ export const config = {
 };
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // Next.js はルートパラメータ (path) を req.query に注入するが、
+  // NestJS の ValidationPipe (forbidNonWhitelisted) がこれを拒否してしまう。
+  // own property を消して Express 標準の URL ベースの query 解析に戻す。
+  delete (req as { query?: unknown }).query;
   const server = await getServer();
   server(req, res);
 }
